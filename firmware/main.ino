@@ -284,12 +284,14 @@ void setupHTTPSever()
   }
 
   http_server.on("/api/info", HTTP_GET, [](AsyncWebServerRequest *request) {
-    char json[384];
+    char json[512];
     snprintf(json, sizeof(json),
              "{\"name\":\"HaldenFunk\",\"version\":\"%s\",\"board\":\"%s\",\"node\":\"%s\",\"ssid\":\"%s\","
-             "\"lora\":%s,\"freq\":%.3f,\"sf\":%d,\"txPower\":%d,\"routes\":%d,\"clients\":%d,\"sd\":%s,\"uptime\":%lu}",
+             "\"lora\":%s,\"freq\":%.3f,\"sf\":%d,\"txPower\":%d,\"routes\":%d,\"clients\":%d,\"sd\":%s,\"uptime\":%lu,"
+             "\"heap\":%u,\"minHeap\":%u,\"maxBlock\":%u,\"heapWarn\":%u}",
              DAR_VERSION, BOARD_NAME, nodeAddress, ssid, loraInitialized ? "true" : "false", loraFreqMHz(), spreadingFactor,
-             txPower, routes, clients, sdInitialized ? "true" : "false", (unsigned long)(millis() / 1000));
+             txPower, routes, clients, sdInitialized ? "true" : "false", (unsigned long)(millis() / 1000),
+             (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMinFreeHeap(), (unsigned)ESP.getMaxAllocHeap(), (unsigned)HEAP_WARN_BYTES);
     request->send(200, "application/json", json);
   });
 
@@ -661,6 +663,15 @@ void loop()
       Serial.printf("--> clients=%d routes=%d\n", clients, routes);
       drawStatusBar();
     }
+  }
+  // Freien Speicher alle 30 s seriell melden, unter HEAP_WARN_BYTES mit Warnung
+  static unsigned long lastHeapPrint = 0;
+  if (millis() - lastHeapPrint > 30000)
+  {
+    lastHeapPrint = millis();
+    uint32_t freeHeap = ESP.getFreeHeap();
+    Serial.printf("[HEAP] frei %u B | Minimum %u B | groesster Block %u B%s\n", (unsigned)freeHeap, (unsigned)ESP.getMinFreeHeap(),
+                  (unsigned)ESP.getMaxAllocHeap(), freeHeap < HEAP_WARN_BYTES ? " | WARNUNG: wenig freier Speicher" : "");
   }
   // WLAN-AP pruefen/neu starten und Zugangsdaten regelmaessig ausgeben
   if (!useBLE && ssid[0] && WiFi.getMode() & WIFI_AP)

@@ -1,5 +1,8 @@
 # HaldenFunk
 
+> **Neuer Entwicklungsstand: WLAN ohne Passwort.** Zusätzliche WLAN-plus-BLE-UART-Testprofile verbinden ohne PIN; Standardprofile bleiben WLAN-only. [Zugang, Update und Abnahme](docs/OFFENER_ZUGANG.md). Frühere Releases/Flyer können noch Passwortzugänge beschreiben.
+
+
 **Glück Auf – Mesh fürs Mansfelder Land**
 
 **🔴 Live-Demo (simulierte Daten, kein Gerät nötig): https://pietwars.github.io/HaldenFunk/**
@@ -84,10 +87,10 @@ pip install platformio
 cd firmware
 pio run -e t3s3-sx1262 -t upload      # Firmware
 pio run -e t3s3-sx1262 -t uploadfs    # Weboberfläche (LittleFS)
-pio device monitor                     # zeigt WLAN-Name und Passwort
+pio device monitor                     # zeigt WLAN-Name und offenen Zugang
 ```
 
-Dann mit dem WLAN **`HaldenFunk-XXXXXX`** verbinden. Das **Passwort ist pro Gerät zufällig** (einmal erzeugt, im NVS gespeichert) und wird seriell sowie auf dem OLED angezeigt. Im Browser `http://192.168.4.1` öffnen (oder `http://haldenfunk.local`).
+Dann mit dem offenen WLAN `HaldenFunk-XXXXXX` ohne Passwort verbinden und `http://192.168.4.1` öffnen. Betreiberkonsole nur über USB; Telnet ist deaktiviert.
 
 Standard-Funkparameter (EU868): 869,525 MHz, 125 kHz, SF9, 14 dBm.
 
@@ -105,3 +108,4 @@ Standard-Funkparameter (EU868): 869,525 MHz, 125 kHz, SF9, 14 dBm.
 - `firmware/`: GPLv3 und AGPLv3 (dual, wie upstream); `web/`: AGPLv3
 - **Kartendaten:** © OpenStreetMap-Mitwirkende, [ODbL 1.0](web/static/map/ODbL-1.0.txt)
 - **Bilder:** Hintergrund, Kopfbild und Icon sind eigene, programmatisch erzeugte Grafiken (`tools/make_bg.py`). Es werden keine Fotos von Wikimedia Commons oder anderen Quellen verwendet
+

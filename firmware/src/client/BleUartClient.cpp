@@ -1,6 +1,10 @@
 #ifdef HAS_BLE
 #include "BleUartClient.h"
 #include "settings/settings.h"
+#include <freertos/FreeRTOS.h>
+#include <freertos/queue.h>
+#include "OpenUart.h"
+#include <atomic>
 
 /** Comment out to stop debug output */
 // #define DEBUG_OUT
@@ -28,56 +32,28 @@ BLEService *uartService;
 BLEServer *pServer;
 
 /** Flag if device is connected */
-bool deviceConnected = false;
+std::atomic_bool deviceConnected{false};
 
 /** Flag if we already registered on the server */
-bool notifEnabled = false;
+std::atomic_bool notifEnabled{false};
 
 /** Unique device name */
-char apName[] = "DR-xxxxxxxxxxxx";
+char apName[32] = {};
 
-uint8_t txData[512] = {0};
-uint8_t rxData[512] = {0};
-size_t rxLen = 0;
-bool dataRcvd = false;
+// BT callbacks enqueue bounded frames; all routing and history replay stay on loop().
+struct UartFrame { size_t len; uint8_t data[233]; };
+QueueHandle_t rxQueue = nullptr, txQueue = nullptr;
 
 extern BleUartClient ble_client;
 void (*connectCallback)(BleUartClient *);
 
 void BleUartClient::receive(struct Datagram datagram, size_t len)
 {
-  if (deviceConnected)
-  {
-#ifdef DEBUG_OUT
-    Serial.printf("BLE:receive %s length %d\n", (char *)datagram.message, len - DATAGRAM_HEADER);
-    Serial.println("BLE::receive raw data");
-    for (int idx = 0; idx < len - DATAGRAM_HEADER; idx++)
-    {
-      Serial.printf("%02X ", datagram.message[idx]);
-    }
-    Serial.println("");
-#endif
-
-    unsigned char buf[len - DATAGRAM_HEADER] = {'\0'};
-    memcpy(buf, &datagram.message, len-DATAGRAM_HEADER);
-
-#ifdef DEBUG_OUT
-    Serial.printf("BLE: Sending raw data with len %d\n", sizeof(buf));
-    for (int idx = 0; idx < sizeof(buf); idx++)
-    {
-      Serial.printf("%02X ", buf[idx]);
-    }
-    Serial.println("");
-
-    Serial.printf("BLE::receive %s len %d type %c\n", buf, sizeof(buf), datagram.type);
-#endif
-
-    pCharacteristicUartTX->setValue(buf, sizeof(buf));
-    pCharacteristicUartTX->notify();
-
-    // Give BLE time to get the data out
-    delay(100);
-  }
+  if (!txQueue || !deviceConnected || !notifEnabled || len <= DATAGRAM_HEADER || len-DATAGRAM_HEADER > sizeof(datagram.message)) return;
+  UartFrame f{}; f.len=len-DATAGRAM_HEADER;
+  if(f.len>sizeof(f.data)) return;
+  memcpy(f.data,datagram.message,f.len);
+  xQueueSend(txQueue,&f,0); // bounded queue; never stall LoRa/WLAN for a slow phone
 }
 
 void BleUartClient::handleData(void *data, size_t len)
@@ -93,40 +69,10 @@ void BleUartClient::handleData(void *data, size_t len)
   Serial.println("");
 #endif
 
+  if (!disaster::validPublicUart(static_cast<const uint8_t*>(data),len)) return;
   char *msg = (char *)data;
-
-  if (msg[2] == 'u')
-  {
-    if (msg[4] == '~')
-    {
-      // delete username
-      username = "";
-      saveUsername(username);
-#ifdef DEBUG_OUT
-      Serial.printf("Deleted username over BLE\n");
-#endif
-      return;
-    }
-    else
-    {
-      // username set over BLE
-      username = String(&msg[4]);
-      Serial.printf("Username set over BLE: %s\n", username.c_str());
-      saveUsername(username);
-      return;
-    }
-  }
-
-  if (msg[2] == 'i')
-  {
-    // Switch to WiFi interface
-#ifdef DEBUG_OUT
-    Serial.printf("User wants to switch to WiFi");
-#endif
-    saveUI(false);
-    delay(500);
-    ESP.restart();
-  }
+  // UART messaging only; no UI switching/restart or console commands over BLE.
+  if (msg[3] != '|' || (msg[2] != 'c' && msg[2] != 'b')) return;
 
   struct Datagram datagram = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
   memset(datagram.message, 0, 233);
@@ -150,7 +96,7 @@ class MyServerCallbacks : public BLEServerCallbacks
 #ifdef DEBUG_OUT
     Serial.println("BLE client connected");
 #endif
-    pServer->updatePeerMTU(pServer->getConnId(), 260);
+    // MTU is negotiated by the phone, never assume a 260-byte peer MTU.
     deviceConnected = true;
   };
 
@@ -161,6 +107,8 @@ class MyServerCallbacks : public BLEServerCallbacks
 #endif
     deviceConnected = false;
     notifEnabled = false;
+    if(rxQueue)xQueueReset(rxQueue);
+    if(txQueue)xQueueReset(txQueue);
     pAdvertising->start();
   }
 };
@@ -173,24 +121,10 @@ class UartTxCbHandler : public BLECharacteristicCallbacks
 {
   void onWrite(BLECharacteristic *pCharacteristic)
   {
-    std::string rxValue = pCharacteristic->getValue();
-    rxLen = rxValue.size();
-
-    if ((rxLen > 0) && (dataRcvd == false))
-    {
-      strncpy((char *)rxData, rxValue.c_str(), 512);
-
-#ifdef DEBUG_OUT
-      Serial.printf("BLE:onWrite write callback received %s length %d\n", (char *)rxData, rxLen);
-      Serial.println("BLE:onWrite raw data");
-      for (int idx = 0; idx < rxLen; idx++)
-      {
-        Serial.printf("%02X ", rxData[idx]);
-      }
-      Serial.println("");
-#endif
-      dataRcvd = true;
-    }
+    const auto value=pCharacteristic->getValue();
+    if(!rxQueue || !disaster::validPublicUart(reinterpret_cast<const uint8_t*>(value.c_str()),value.length())) return;
+    UartFrame f{};f.len=value.length();memcpy(f.data,value.c_str(),f.len);
+    xQueueSend(rxQueue,&f,0);
   };
 };
 
@@ -198,28 +132,14 @@ class DescriptorCallbacks : public BLEDescriptorCallbacks
 {
   void onWrite(BLEDescriptor *pDescriptor)
   {
-    uint8_t *descrValue;
-    descrValue = pDescriptor->getValue();
+    if (pDescriptor->getLength() < 2) return;
+    uint8_t *descrValue = pDescriptor->getValue();
     if (descrValue[0] & (1 << 0))
     {
 #ifdef DEBUG_OUT
       Serial.println("Notifications enabled");
 #endif
-      if (connectCallback)
-      {
-        if (!notifEnabled)
-        {
-          connectCallback(&ble_client);
-          notifEnabled = true;
-        }
-        else
-        {
-          if (history)
-          {
-            history->replay(&ble_client);
-          }
-        }
-      }
+      notifEnabled = true;
     }
     else
     {
@@ -235,10 +155,18 @@ bool oldStatus = false;
 
 void BleUartClient::loop(void)
 {
-  if (dataRcvd)
-  {
-    handleData(rxData, rxLen);
-    dataRcvd = false;
+  UartFrame received{};
+  if(rxQueue && xQueueReceive(rxQueue,&received,0)==pdTRUE) handleData(received.data,received.len);
+  static UartFrame sending{}; static size_t offset=0; static uint32_t last=0;
+  if(!deviceConnected || !notifEnabled) { sending.len=0;offset=0;if(txQueue)xQueueReset(txQueue); }
+  else if(txQueue && uint32_t(millis()-last)>=20) {
+    if(!sending.len && xQueueReceive(txQueue,&sending,0)==pdTRUE) offset=0;
+    if(sending.len) {
+      const uint16_t mtu=pServer->getPeerMTU(pServer->getConnId());
+      const size_t chunk=disaster::uartChunkSize(mtu,sending.len-offset);
+      pCharacteristicUartTX->setValue(sending.data+offset,chunk);pCharacteristicUartTX->notify();
+      offset+=chunk;last=millis();if(offset==sending.len){sending.len=0;offset=0;}
+    }
   }
   if (notifEnabled && !oldStatus)
   {
@@ -266,13 +194,16 @@ void BleUartClient::startServer(void (*callback)(BleUartClient *))
   connectCallback = callback;
 
   init();
+  if(rxQueue && txQueue && connectCallback) connectCallback(&ble_client);
 }
 
 void BleUartClient::init()
 {
+  rxQueue=xQueueCreate(4,sizeof(UartFrame));txQueue=xQueueCreate(8,sizeof(UartFrame));
+  if(!rxQueue || !txQueue) { Serial.println("[BLE] Kein RAM fuer BLE-UART; WLAN bleibt aktiv"); return; }
   uint64_t uniqueId = ESP.getEfuseMac();
   // Using ESP32 MAC (48 bytes only, so upper 2 bytes will be 0)
-  sprintf(apName, "DR-%02X%02X%02X%02X%02X%02X",
+  snprintf(apName, sizeof(apName), "HaldenFunk-%02X%02X%02X%02X%02X%02X",
           (uint8_t)(uniqueId), (uint8_t)(uniqueId >> 8),
           (uint8_t)(uniqueId >> 16), (uint8_t)(uniqueId >> 24),
           (uint8_t)(uniqueId >> 32), (uint8_t)(uniqueId >> 40));
@@ -282,6 +213,7 @@ void BleUartClient::init()
 
   // Initialize BLE and set output power
   BLEDevice::init(apName);
+  // Default GATT permissions are open: no pairing PIN or configuration service.
   BLEDevice::setMTU(260);
   BLEDevice::setPower(ESP_PWR_LVL_P7);
 
@@ -332,3 +264,4 @@ void BleUartClient::init()
 }
 
 #endif
+

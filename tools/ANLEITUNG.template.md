@@ -1,3 +1,5 @@
+> Neuer Entwicklungsstand: WLAN ohne Passwort; BLE-UART ohne PIN in den zusätzlichen Testprofilen. Alte Kopplungen bei Bedarf am Handy entfernen. Betreiberzugang bleibt getrennt geschützt. Details: https://github.com/Pietwars/HaldenFunk/blob/main/docs/OFFENER_ZUGANG.md
+
 # HaldenFunk für @BOARD@
 
 Version @VERSION@ (Commit @COMMIT@) · Quelle: https://github.com/Pietwars/HaldenFunk
@@ -14,25 +16,14 @@ Version @VERSION@ (Commit @COMMIT@) · Quelle: https://github.com/Pietwars/Halde
 2. https://espressif.github.io/esptool-js/ öffnen, Baudrate 921600 (bei Problemen 115200), **Connect** und den Port wählen.
    - T3-S3: Wird kein Port gefunden, **BOOT** gedrückt halten, kurz **RST** drücken, BOOT loslassen.
 3. Bei **Flash Address** `0x0` eintragen und `HaldenFunk-@ZIP@-factory.bin` wählen.
-4. Optional zuerst **Erase Flash** (löscht alles, auch gespeicherte Aushänge und das WLAN-Passwort).
+4. Optional zuerst **Erase Flash** (löscht alles, auch gespeicherte Aushänge und Einstellungen).
 5. **Program** und warten, bis „Leaving…“ erscheint. Dann **RST** drücken oder kurz vom Strom trennen.
 
 Die factory-Datei enthält Bootloader (@BOOT@), Partitionstabelle (0x8000), boot_app0 (0xe000), Firmware (0x10000) und Weboberfläche/Karten als LittleFS (0x200000).
 
-## 3. WLAN-Passwort ablesen
+## 3. Ohne Passwort verbinden
 
-Jedes Gerät erzeugt beim ersten Start ein **eigenes Zufallspasswort**. So kommst du dran:
-
-1. In esptool-js auf **Disconnect**, dann unten im Bereich **Console** mit **115200** Baud verbinden (oder ein anderer serieller Monitor mit 115200).
-2. **RST** drücken. Es erscheint:
-   ```
-   WLAN: HaldenFunk-XXXXXX
-   Passwort: xxxxxxxxxxxx
-   Browser: http://192.168.4.1
-   ```
-3. Passwort notieren (z. B. auf das Gehäuse kleben). Es bleibt bei Updates erhalten, nur „Erase Flash“ erzeugt ein neues.
-
-Dann mit dem Handy ins WLAN und `http://192.168.4.1` öffnen.
+Am Handy das WLAN `HaldenFunk-XXXXXX` auswählen und ohne Passwort verbinden. Bei „Kein Internet“ verbunden bleiben, dann `http://192.168.4.1` öffnen. Telnet ist deaktiviert; Konfiguration erfolgt über USB. BLE-UART ohne PIN ist in den zusätzlichen `*-ble`-Testprofilen verfügbar; deren abweichende Partitionierung beachten.
 
 ## 4. Update (nur Firmware)
 
@@ -54,3 +45,4 @@ Nur wenn sich Weboberfläche oder Karten geändert haben: zusätzlich `teile/lit
 | `teile/littlefs.bin` | 0x200000 |
 
 Kartendaten: © OpenStreetMap-Mitwirkende, ODbL 1.0. Grundlage: sudomesh/disaster-radio (GPLv3/AGPLv3).
+

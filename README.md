@@ -109,6 +109,10 @@ Dann mit dem WLAN **`HaldenFunk-XXXXXX`** verbinden. Das **Passwort ist pro Ger�
 
 Standard-Funkparameter (EU868): 869,525 MHz, 125 kHz, SF9, 14 dBm.
 
+## Gemeinsamer Kern mit DisAHRsterRadio
+
+HaldenFunk wird nicht als zweite Kopie gepflegt: Alle Kern-Dateien (Firmware, Web-Oberfläche, Werkzeuge, Workflows) entsprechen exakt [DisAHRsterRadio](https://github.com/Pietwars/DisAHRsterRadio) in der Revision aus `region/CORE` plus dem regionalen Overlay `region/overlay.patch`. CI prüft das bei jedem Build (`python3 tools/core_sync.py --check`). Neuen Kern übernehmen: `python3 tools/core_sync.py --update`. Details: [docs/KERN_UND_REGION.md](docs/KERN_UND_REGION.md).
+
 ## Bekannte Grenzen
 
 - Nicht auf Hardware getestet; Pinbelegungen von DisAHRsterRadio übernommen

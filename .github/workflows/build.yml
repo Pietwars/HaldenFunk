@@ -13,6 +13,11 @@ jobs:
           python-version: '3.12'
       - name: Versionsprüfung (VERSION ist die einzige Quelle)
         run: python tools/version.py --check && python tests/version.test.py
+      - name: Kartenprüfung
+        run: python tests/maps.test.py
+      - name: Kern-Abgleich (nur in Regionalvarianten mit region/CORE, z. B. HaldenFunk)
+        if: hashFiles('region/CORE') != ''
+        run: python tools/core_sync.py --check
   build:
     runs-on: ubuntu-latest
     strategy:

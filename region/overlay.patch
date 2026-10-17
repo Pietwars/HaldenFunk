@@ -1,0 +1,891 @@
+diff --git a/.github/workflows/release.yml b/.github/workflows/release.yml
+index 2b5ae75..d9ea22f 100644
+--- a/.github/workflows/release.yml
++++ b/.github/workflows/release.yml
+@@ -57,11 +57,11 @@ jobs:
+       - name: Pakete prüfen (Vollständigkeit, Prüfsummen, Version)
+         run: |
+           V=$(python3 tools/version.py --get)
+-          python3 tools/verify_release.py dist DisAHRsterRadio "$V" littlefs.bin t3s3 t3-v161 heltec-v2
+-          (cd dist && sha256sum *.zip > SHA256SUMS-DisAHRsterRadio-$V.txt)
++          python3 tools/verify_release.py dist HaldenFunk "$V" littlefs.bin t3s3 t3-v161 heltec-v2
++          (cd dist && sha256sum *.zip > SHA256SUMS-HaldenFunk-$V.txt)
+       - name: Release-Text erzeugen
+         run: |
+-          python3 tools/release_notes.py "$(python3 tools/version.py --get)" "${{ github.repository }}" DisAHRsterRadio \
++          python3 tools/release_notes.py "$(python3 tools/version.py --get)" "${{ github.repository }}" HaldenFunk \
+             "t3s3=LILYGO T3-S3 V1.3 (SX1262)" "t3-v161=LILYGO T3 V1.6.1 (SX1276)" "heltec-v2=Heltec WiFi LoRa 32 V2 (SX1276)" | tee notes.md
+       - name: Vorabversion veröffentlichen
+         if: env.TAG != ''
+@@ -73,6 +73,6 @@ jobs:
+           if gh release view "$TAG" >/dev/null 2>&1; then
+             gh release upload "$TAG" $ASSETS --clobber
+           else
+-            gh release create "$TAG" --prerelease --verify-tag --title "DisAHRsterRadio $TAG (Vorabversion)" --notes-file notes.md $ASSETS
++            gh release create "$TAG" --prerelease --verify-tag --title "HaldenFunk $TAG (Vorabversion)" --notes-file notes.md $ASSETS
+           fi
+           gh release view "$TAG" --json assets --jq '.assets[].name'
+diff --git a/firmware/config.h b/firmware/config.h
+index 10c2b57..68c802a 100644
+--- a/firmware/config.h
++++ b/firmware/config.h
+@@ -13,8 +13,9 @@
+ #define HEAP_WARN_BYTES 40960
+ #endif
+ 
+-// EU868 Standard: 869.525 MHz (Teilband g3, 10 % Duty-Cycle), 125 kHz, SF9, 14 dBm
+-#define LORA_DEFAULT_FREQ_MHZ 869.525f
++// Funkparameter: Funkprofile in lib/LoRaLayer2/src/RadioPresets.h
++// Standard "EU Narrow": 869.618 MHz, 62.5 kHz, SF8, CR 4/8 (Teilband 869,4-869,65 MHz, 10 %, max. 500 mW ERP)
++#define LORA_DEFAULT_FREQ_MHZ 869.618f
+ 
+ #ifndef STARTUP_STAGGER_MS
+ #define STARTUP_STAGGER_MS 150
+diff --git a/firmware/lib/LoRaLayer2/src/Layer1_RadioLib.cpp b/firmware/lib/LoRaLayer2/src/Layer1_RadioLib.cpp
+index a57d062..19f4102 100644
+--- a/firmware/lib/LoRaLayer2/src/Layer1_RadioLib.cpp
++++ b/firmware/lib/LoRaLayer2/src/Layer1_RadioLib.cpp
+@@ -5,11 +5,14 @@ static volatile bool _transmitFlag = false;
+ uint32_t Layer1Class::_holdUntil = 0;
+ 
+ Layer1Class::Layer1Class(L1Radio *lora, int mode, int cs, int reset, int dio, uint8_t sf,
+-                         float frequency, int power, float bandwidth, float tcxo)
++                         float frequency, int power, float bandwidth, float tcxo, uint8_t cr, float dutyLimit)
+ : _LoRa(lora), _mode(mode), _csPin(cs), _resetPin(reset), _DIOPin(dio), _spreadingFactor(sf),
+   _loraFrequency(frequency), _txPower(power), _loraInitialized(0), _spiFrequency(2000000),
+-  _bandwidth(bandwidth), _tcxo(tcxo)
++  _bandwidth(bandwidth), _tcxo(tcxo), _codingRate(cr), _dutyLimit(dutyLimit),
++  _slotStart(0), _slotIdx(0), _lastAirtimeMs(0), _deferred(0), _blocked(false), _hasPending(false)
+ {
++    if (_txPower > L1_MAX_DBM) _txPower = L1_MAX_DBM; // nie ueber Chipgrenze
++    memset(_slots, 0, sizeof(_slots));
+     txBuffer = new packetBuffer();
+     rxBuffer = new packetBuffer();
+ }
+@@ -21,25 +24,38 @@ void Layer1Class::setFlag(void) { _dioFlag = true; }
+ 
+ int Layer1Class::init() {
+ #if defined(RL_SX1262)
+-    int state = _LoRa->begin(_loraFrequency, _bandwidth, _spreadingFactor, 5,
++    int state = _LoRa->begin(_loraFrequency, _bandwidth, _spreadingFactor, _codingRate,
+                              RADIOLIB_SX126X_SYNC_WORD_PRIVATE, _txPower, 8, _tcxo, false);
+     if (state == RADIOLIB_ERR_NONE) {
+         _LoRa->setDio2AsRfSwitch(true);
+-        _LoRa->setCurrentLimit(140);
++        _LoRa->setCurrentLimit(140);          // PA-Strombegrenzung (mA)
++        _LoRa->setRxBoostedGainMode(true);    // bessere Empfindlichkeit (+~2 dB, etwas mehr Strom)
++        _LoRa->setCRC(2);
++        _LoRa->explicitHeader();
++        _LoRa->autoLDRO();                    // Low-Data-Rate-Optimierung automatisch (SF11/12 @ BW125)
+     }
+ #else
+-    int state = _LoRa->begin(_loraFrequency, _bandwidth, _spreadingFactor, 5,
++    int state = _LoRa->begin(_loraFrequency, _bandwidth, _spreadingFactor, _codingRate,
+                              RADIOLIB_SX127X_SYNC_WORD, _txPower, 8, 0);
++    if (state == RADIOLIB_ERR_NONE) {
++        _LoRa->setCurrentLimit(120);          // OCP (mA), PA_BOOST bis 20 dBm
++        _LoRa->setCRC(true);
++        _LoRa->explicitHeader();
++        _LoRa->autoLDRO();
++    }
+ #endif
+-    Serial.printf("Layer1::init(): RadioLib state = %d\r\n", state);
++    Serial.printf("Layer1::init(): RadioLib state = %d (%.3f MHz, BW %.1f, SF%d, CR4/%d, %d dBm)\r\n",
++                  state, _loraFrequency, _bandwidth, _spreadingFactor, _codingRate, _txPower);
+     if (state != RADIOLIB_ERR_NONE) return 0;
+     _LoRa->setPacketReceivedAction(Layer1Class::setFlag);
+     if (_LoRa->startReceive() != RADIOLIB_ERR_NONE) return 0;
++    _slotStart = millis();
+     _loraInitialized = 1;
+     return 1;
+ }
+ 
+ void Layer1Class::setTxPower(int p) {
++    if (p > L1_MAX_DBM) p = L1_MAX_DBM;
+     if (_LoRa->setOutputPower(p) == RADIOLIB_ERR_NONE) _txPower = p;
+ }
+ 
+@@ -48,6 +64,26 @@ void Layer1Class::setSpreadingFactor(uint8_t sf) {
+     _LoRa->startReceive();
+ }
+ 
++uint32_t Layer1Class::timeOnAirMs(size_t len) {
++    return (uint32_t)((_LoRa->getTimeOnAir(len) + 999) / 1000); // RadioLib liefert Mikrosekunden
++}
++
++void Layer1Class::rollSlots() {
++    uint32_t now = millis();
++    while (now - _slotStart >= L1_AIRTIME_SLOT_MS) {
++        _slotStart += L1_AIRTIME_SLOT_MS;
++        _slotIdx = (_slotIdx + 1) % L1_AIRTIME_SLOTS;
++        _slots[_slotIdx] = 0;
++    }
++}
++
++uint32_t Layer1Class::airtimeUsedMs() {
++    rollSlots();
++    uint32_t s = 0;
++    for (int i = 0; i < L1_AIRTIME_SLOTS; i++) s += _slots[i];
++    return s;
++}
++
+ int Layer1Class::sendPacket(char *data, size_t len) {
+     _transmitFlag = true;
+     int state = _LoRa->startTransmit((uint8_t *)data, len);
+@@ -62,9 +98,24 @@ int Layer1Class::sendPacket(char *data, size_t len) {
+ int Layer1Class::transmit() {
+     if (_transmitFlag) return 0; // laufende Aussendung abwarten
+     if ((int32_t)(millis() - _holdUntil) < 0) return 0; // Sendepause (WLAN-Start)
+-    BufferEntry entry = txBuffer->read();
+-    if (entry.length > 0) sendPacket(entry.data, entry.length);
+-    return entry.length;
++    if (!_hasPending) {
++        _pending = txBuffer->read();
++        if (_pending.length <= 0) return 0;
++        _hasPending = true;
++    }
++    uint32_t toa = timeOnAirMs(_pending.length);
++    // Sendezeitgrenze des Teilbands (gleitende Stunde): Paket zurueckhalten statt senden
++    if (airtimeUsedMs() + toa > airtimeBudgetMs()) {
++        if (!_blocked) { _deferred++; Serial.printf("[DUTY] Sendezeitgrenze erreicht, Paket wartet\r\n"); }
++        _blocked = true;
++        return 0;
++    }
++    _blocked = false;
++    _hasPending = false;
++    if (sendPacket(_pending.data, _pending.length) != 0) return 0;
++    _slots[_slotIdx] += toa;
++    _lastAirtimeMs = toa;
++    return _pending.length;
+ }
+ 
+ int Layer1Class::receive() {
+diff --git a/firmware/lib/LoRaLayer2/src/Layer1_RadioLib.h b/firmware/lib/LoRaLayer2/src/Layer1_RadioLib.h
+index 9f1979d..dbf072e 100644
+--- a/firmware/lib/LoRaLayer2/src/Layer1_RadioLib.h
++++ b/firmware/lib/LoRaLayer2/src/Layer1_RadioLib.h
+@@ -1,24 +1,32 @@
+ // DisAHRsterRadio: vereinheitlichte RadioLib-Layer1 (ersetzt Layer1_LoRa/Layer1_SX1276/Layer1_SX126x
+ // aus sudomesh/LoRaLayer2). Unterstuetzt SX1276 (RL_SX1276) und SX1262 (RL_SX1262), RadioLib >= 7.
++// Funkprofile siehe RadioPresets.h; Sendezeit-Buchfuehrung (gleitende Stunde) mit getTimeOnAir().
+ #ifndef LAYER1_RADIOLIB_H
+ #define LAYER1_RADIOLIB_H
+ #include <Arduino.h>
+ #include <RadioLib.h>
+ #include <SPI.h>
+ #include <packetBuffer.h>
++#include <RadioPresets.h>
+ 
+ #if defined(RL_SX1262)
+ typedef SX1262 L1Radio;
++#define L1_MAX_DBM 22
+ #elif defined(RL_SX1276)
+ typedef SX1276 L1Radio;
++#define L1_MAX_DBM 20
+ #else
+ #error "RL_SX1262 oder RL_SX1276 definieren"
+ #endif
+ 
++#define L1_AIRTIME_SLOTS 60          // 60 x 1 min = gleitende Stunde
++#define L1_AIRTIME_SLOT_MS 60000UL
++
+ class Layer1Class {
+ public:
+-    Layer1Class(L1Radio *lora, int mode, int cs, int reset, int dio, uint8_t sf = 9,
+-                float frequency = 869.525, int power = 14, float bandwidth = 125.0, float tcxo = 0.0);
++    Layer1Class(L1Radio *lora, int mode, int cs, int reset, int dio, uint8_t sf = 8,
++                float frequency = 869.618, int power = 14, float bandwidth = 62.5, float tcxo = 0.0,
++                uint8_t cr = 8, float dutyLimit = 0.10f);
+     static int getTime() { return millis(); }
+     int spreadingFactor() { return _spreadingFactor; }
+     int loraInitialized() { return _loraInitialized; }
+@@ -27,12 +35,22 @@ public:
+     int DIOPin() { return _DIOPin; }
+     long spiFrequency() { return _spiFrequency; }
+     float loraFrequency() { return _loraFrequency; }
++    float bandwidth() { return _bandwidth; }
++    int codingRate() { return _codingRate; }
+     int txPower() { return _txPower; }
+     void setTxPower(int p);
+     // LoRa-Senden fuer ms Millisekunden zurueckhalten (z. B. waehrend WLAN-Start)
+     static void holdTx(uint32_t ms) { _holdUntil = millis() + ms; }
+     static uint32_t _holdUntil;
+     void setSpreadingFactor(uint8_t sf);
++    // Sendezeit (ms) eines Pakets dieser Laenge mit den aktuellen Funkparametern
++    uint32_t timeOnAirMs(size_t len);
++    uint32_t lastAirtimeMs() { return _lastAirtimeMs; }
++    uint32_t airtimeUsedMs();                       // Summe der letzten Stunde
++    uint32_t airtimeBudgetMs() { return (uint32_t)(_dutyLimit * 3600000.0f); }
++    float dutyLimit() { return _dutyLimit; }
++    uint32_t deferredCount() { return _deferred; }  // wegen Sendezeitgrenze zurueckgehaltene Versuche
++    bool txBlocked() { return _blocked; }
+     packetBuffer *txBuffer;
+     packetBuffer *rxBuffer;
+     int init();
+@@ -41,6 +59,7 @@ public:
+ private:
+     static void setFlag(void);
+     int sendPacket(char *data, size_t len);
++    void rollSlots();
+     L1Radio *_LoRa;
+     int _mode, _csPin, _resetPin, _DIOPin;
+     uint8_t _spreadingFactor;
+@@ -50,5 +69,15 @@ private:
+     long _spiFrequency;
+     float _bandwidth;
+     float _tcxo;
++    uint8_t _codingRate;
++    float _dutyLimit;
++    uint32_t _slots[L1_AIRTIME_SLOTS];
++    uint32_t _slotStart;
++    int _slotIdx;
++    uint32_t _lastAirtimeMs;
++    uint32_t _deferred;
++    bool _blocked;
++    BufferEntry _pending;
++    bool _hasPending;
+ };
+ #endif
+diff --git a/firmware/lib/LoRaLayer2/src/LoRaLayer2.cpp b/firmware/lib/LoRaLayer2/src/LoRaLayer2.cpp
+index a9f53fd..37fcfea 100644
+--- a/firmware/lib/LoRaLayer2/src/LoRaLayer2.cpp
++++ b/firmware/lib/LoRaLayer2/src/LoRaLayer2.cpp
+@@ -684,7 +684,8 @@ int LL2Class::daemon(){
+           Serial.printf("LL2::daemon(): transmitted packet of length: %d\r\n", length);
+           #endif
+           _lastTransmitTime = Layer1Class::getTime();
+-          double airtime = calculateAirtime((double)length, (double)LoRa1->spreadingFactor(), 1, 0, 5, 125);
++          // Sendezeit aus RadioLib (getTimeOnAir) mit den aktiven Funkparametern statt fester SF/BW125/CR5-Formel
++          double airtime = (double)LoRa1->lastAirtimeMs();
+           _dutyInterval = (int)ceil(airtime/_dutyCycle);
+           _messageCount = (_messageCount + 1) % 256;
+         }
+diff --git a/firmware/lib/LoRaLayer2/src/RadioPresets.h b/firmware/lib/LoRaLayer2/src/RadioPresets.h
+new file mode 100644
+index 0000000..603e80f
+--- /dev/null
++++ b/firmware/lib/LoRaLayer2/src/RadioPresets.h
+@@ -0,0 +1,34 @@
++// DisAHRsterRadio/HaldenFunk: Funkprofile fuer 868 MHz in Deutschland
++// (ETSI EN 300 220 / BNetzA SRD-Allgemeinzuteilung, Teilband 869,4-869,65 MHz:
++//  max. 500 mW ERP, 10 % Sendezeit). Alle Profile liegen vollstaendig in diesem Teilband:
++//  62,5 kHz auf 869,618 MHz (869,587-869,649), 125/250 kHz auf 869,525 MHz (869,400-869,650).
++// Alle Knoten eines Netzes muessen dasselbe Profil verwenden.
++#ifndef RADIO_PRESETS_H
++#define RADIO_PRESETS_H
++#include <stdint.h>
++
++struct RadioPreset {
++    const char *id;
++    const char *name;
++    float freqMHz;
++    float bwKHz;
++    uint8_t sf;
++    uint8_t cr;          // Nenner der Coderate (5..8 => 4/5..4/8)
++    float dutyLimit;     // erlaubter Sendezeitanteil im Teilband (0.10 = 10 %)
++    uint8_t maxErpDbm;   // Grenze des Teilbands (27 dBm = 500 mW ERP)
++};
++
++static const RadioPreset RADIO_PRESETS[] = {
++    {"eu-narrow", "EU Narrow (Standard)",        869.618f,  62.5f,  8, 8, 0.10f, 27},
++    {"nah",       "Nah/Schnell",                 869.525f, 250.0f,  7, 5, 0.10f, 27},
++    {"mittel",    "Mittel (bisheriger Standard)", 869.525f, 125.0f,  9, 5, 0.10f, 27},
++    {"fern",      "Fern",                        869.525f, 125.0f, 12, 8, 0.10f, 27},
++    {"longfast",  "LongFast-aehnlich",           869.525f, 250.0f, 11, 5, 0.10f, 27},
++};
++static const int RADIO_PRESET_COUNT = sizeof(RADIO_PRESETS) / sizeof(RADIO_PRESETS[0]);
++static const int RADIO_PRESET_DEFAULT = 0;
++
++static inline const RadioPreset &getRadioPreset(int i) {
++    return RADIO_PRESETS[(i >= 0 && i < RADIO_PRESET_COUNT) ? i : RADIO_PRESET_DEFAULT];
++}
++#endif
+diff --git a/firmware/main.ino b/firmware/main.ino
+index d01d0d6..9be7fc5 100644
+--- a/firmware/main.ino
++++ b/firmware/main.ino
+@@ -24,6 +24,7 @@
+ #include <Layer1_RadioLib.h>
+ 
+ #include <LoRaLayer2.h>
++#include <RadioPresets.h>
+ 
+ // server
+ #include "server/DisasterRadio.h"
+@@ -48,9 +49,9 @@
+ #include "DisasterHistory.h"
+ #include "DisasterMiddleware.h"
+ 
+-#define MDNS_NAME_PREFIX "disahrster"
+-#define HOST_NAME "disahrsterradio"
+-#define WIFI_AP_SSID_PREFIX "DisAHRsterRadio-"
++#define MDNS_NAME_PREFIX "haldenfunk"
++#define HOST_NAME "haldenfunk"
++#define WIFI_AP_SSID_PREFIX "HaldenFunk-"
+ 
+ #define INDEX_FILE "index.html"
+ 
+@@ -91,8 +92,10 @@ LL2Class *LL2;
+ 
+ #include "settings/settings.h"
+ 
+-// 869 (Standard) => 869.525 MHz, sonst ganzzahliger Wert aus den Einstellungen
+-float loraFreqMHz() { return loraFrq == 869 ? LORA_DEFAULT_FREQ_MHZ : (float)loraFrq; }
++// Funkprofil aus den Einstellungen (RadioPresets.h); Frequenz/BW/SF/CR kommen nur noch von dort
++const RadioPreset &activePreset() { return getRadioPreset(radioPreset); }
++float loraFreqMHz() { return activePreset().freqMHz; }
++Layer1Class *Layer1_main = NULL;
+ 
+ DisasterRadio *radio = new DisasterRadio();
+ DisasterHistory *history = NULL;
+@@ -284,17 +287,42 @@ void setupHTTPSever()
+   }
+ 
+   http_server.on("/api/info", HTTP_GET, [](AsyncWebServerRequest *request) {
+-    char json[512];
++    char json[768];
+     snprintf(json, sizeof(json),
+-             "{\"name\":\"DisAHRsterRadio\",\"version\":\"%s\",\"board\":\"%s\",\"node\":\"%s\",\"ssid\":\"%s\","
+-             "\"lora\":%s,\"freq\":%.3f,\"sf\":%d,\"txPower\":%d,\"routes\":%d,\"clients\":%d,\"sd\":%s,\"uptime\":%lu,"
++             "{\"name\":\"HaldenFunk\",\"version\":\"%s\",\"board\":\"%s\",\"node\":\"%s\",\"ssid\":\"%s\","
++             "\"lora\":%s,\"preset\":%d,\"presetId\":\"%s\",\"presetName\":\"%s\",\"freq\":%.3f,\"bw\":%.1f,\"sf\":%d,\"cr\":\"4/%d\",\"airtimeMs\":%lu,\"airtimeBudgetMs\":%lu,\"airtimePct\":%.2f,\"dutyLimitPct\":%.0f,\"txDeferred\":%lu,\"txPower\":%d,\"routes\":%d,\"clients\":%d,\"sd\":%s,\"uptime\":%lu,"
+              "\"heap\":%u,\"minHeap\":%u,\"maxBlock\":%u,\"heapWarn\":%u}",
+-             DAR_VERSION, BOARD_NAME, nodeAddress, ssid, loraInitialized ? "true" : "false", loraFreqMHz(), spreadingFactor,
++             DAR_VERSION, BOARD_NAME, nodeAddress, ssid, loraInitialized ? "true" : "false", radioPreset, activePreset().id, activePreset().name, loraFreqMHz(), activePreset().bwKHz, activePreset().sf, activePreset().cr,
++             (unsigned long)(Layer1_main ? Layer1_main->airtimeUsedMs() : 0), (unsigned long)(activePreset().dutyLimit * 3600000.0f),
++             Layer1_main ? Layer1_main->airtimeUsedMs() / 36000.0f : 0.0f, activePreset().dutyLimit * 100.0f, (unsigned long)(Layer1_main ? Layer1_main->deferredCount() : 0),
+              txPower, routes, clients, sdInitialized ? "true" : "false", (unsigned long)(millis() / 1000),
+              (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMinFreeHeap(), (unsigned)ESP.getMaxAllocHeap(), (unsigned)HEAP_WARN_BYTES);
+     request->send(200, "application/json", json);
+   });
+ 
++  // Funkprofile auflisten / waehlen (gespeichert im NVS, wirksam nach Neustart)
++  http_server.on("/api/presets", HTTP_GET, [](AsyncWebServerRequest *request) {
++    String j = "[";
++    for (int i = 0; i < RADIO_PRESET_COUNT; i++) {
++      const RadioPreset &p = RADIO_PRESETS[i];
++      char b[200];
++      snprintf(b, sizeof(b), "%s{\"i\":%d,\"id\":\"%s\",\"name\":\"%s\",\"freq\":%.3f,\"bw\":%.1f,\"sf\":%d,\"cr\":%d,\"duty\":%.0f}",
++               i ? "," : "", i, p.id, p.name, p.freqMHz, p.bwKHz, p.sf, p.cr, p.dutyLimit * 100.0f);
++      j += b;
++    }
++    request->send(200, "application/json", j + "]");
++  });
++  http_server.on("/api/preset", HTTP_POST, [](AsyncWebServerRequest *request) {
++    if (!request->hasParam("preset", true)) { request->send(400, "text/plain", "preset fehlt"); return; }
++    int p = request->getParam("preset", true)->value().toInt();
++    if (p < 0 || p >= RADIO_PRESET_COUNT) { request->send(400, "text/plain", "ungueltiges Profil"); return; }
++    saveRadioPreset(p);
++    request->send(200, "application/json", "{\"ok\":true,\"restart\":true}");
++    static esp_timer_handle_t t = NULL;
++    if (!t) { esp_timer_create_args_t a = {}; a.callback = [](void *) { ESP.restart(); }; a.name = "rst"; esp_timer_create(&a, &t); }
++    esp_timer_start_once(t, 1500000);
++  });
++
+   http_server.on("/api/board", HTTP_GET, [](AsyncWebServerRequest *request) {
+     request->send(200, "application/json", board ? board->toJson() : String("[]"));
+   });
+@@ -351,11 +379,11 @@ public:
+     Serial.printf("WelcomeMessage username: >%s<\n", username.c_str());
+     if (username.isEmpty())
+     {
+-      msgLen = sprintf(data, "00c|Willkommen bei DisAHRsterRadio ");
++      msgLen = sprintf(data, "00c|Glueck Auf! Willkommen bei HaldenFunk ");
+     }
+     else
+     {
+-      msgLen = snprintf(data, 127, "00c|Willkommen bei DisAHRsterRadio >%s<", username.c_str());
++      msgLen = snprintf(data, 127, "00c|Glueck Auf! Willkommen bei HaldenFunk >%s<", username.c_str());
+     }
+ 
+     struct Datagram datagram1 = buildDatagram(BROADCAST, 'i', (uint8_t *)data, msgLen);
+@@ -429,11 +457,13 @@ void setupLoRa()
+   pinMode(LORA2_CS, OUTPUT);
+   digitalWrite(LORA2_CS, HIGH);
+   #endif
+-  Layer1Class *Layer1_1 = new Layer1Class(&lora, 0, LORA_CS, LORA_RST, LORA_IRQ, spreadingFactor, loraFreqMHz(), txPower, 125.0, LORA_TCXO);
++  const RadioPreset &rp = activePreset();
++  Layer1Class *Layer1_1 = new Layer1Class(&lora, 0, LORA_CS, LORA_RST, LORA_IRQ, rp.sf, rp.freqMHz, txPower, rp.bwKHz, LORA_TCXO, rp.cr, rp.dutyLimit);
++  Layer1_main = Layer1_1;
+   #ifdef DUAL_LORA
+   digitalWrite(LORA_CS, HIGH);
+   digitalWrite(LORA2_CS, LOW);
+-  Layer1Class *Layer1_2 = new Layer1Class(&lora2, 0, LORA2_CS, LORA2_RST, LORA2_IRQ, 7, loraFreqMHz(), txPower, 125.0, LORA_TCXO);
++  Layer1Class *Layer1_2 = new Layer1Class(&lora2, 0, LORA2_CS, LORA2_RST, LORA2_IRQ, rp.sf, rp.freqMHz, txPower, rp.bwKHz, LORA_TCXO, rp.cr, rp.dutyLimit);
+   digitalWrite(LORA_CS, LOW);
+   digitalWrite(LORA2_CS, HIGH);
+   #endif
+@@ -442,6 +472,7 @@ void setupLoRa()
+     #ifndef DUAL_LORA
+     Serial.printf(" --> Layer1 init succeeded\r\n");
+     LL2 = new LL2Class(Layer1_1);
++    LL2->setDutyCycle(rp.dutyLimit);
+     #else
+     if(Layer1_2->init()){
+       Serial.printf(" --> Dual Layer1 init succeeded\r\n");
+@@ -619,7 +650,7 @@ void setup()
+   setCpuFrequencyMhz(CLOCK_SPEED); //Set CPU clock in config.h
+   getCpuFrequencyMhz(); //Get CPU clock
+ 
+-  Serial.printf("\nDisAHRsterRadio %s (%s) - basiert auf sudomesh/disaster-radio\n", DAR_VERSION, BOARD_NAME);
++  Serial.printf("\nHaldenFunk %s (%s) - basiert auf sudomesh/disaster-radio\n", DAR_VERSION, BOARD_NAME);
+   delay(STARTUP_STAGGER_MS); // gestaffelter Start: Spannung stabilisieren lassen
+ #ifndef WIFI_LATE
+   setupNetwork();
+diff --git a/firmware/platformio.ini b/firmware/platformio.ini
+index 82d4106..88f726d 100644
+--- a/firmware/platformio.ini
++++ b/firmware/platformio.ini
+@@ -1,4 +1,4 @@
+-; DisAHRsterRadio – PlatformIO-Konfiguration
++; HaldenFunk – PlatformIO-Konfiguration
+ ; Basis: sudomesh/disaster-radio, modernisiert (Arduino-ESP32 3.x via pioarduino, RadioLib 7, LittleFS)
+ 
+ [platformio]
+diff --git a/firmware/src/middleware/Console.cpp b/firmware/src/middleware/Console.cpp
+index 0775651..3f0783f 100644
+--- a/firmware/src/middleware/Console.cpp
++++ b/firmware/src/middleware/Console.cpp
+@@ -8,6 +8,7 @@
+ #include "../../config.h"
+ #ifndef SIM
+ #include "settings/settings.h"
++#include <RadioPresets.h>
+ #endif
+ 
+ #ifdef SIM
+@@ -65,7 +66,8 @@ void Console::txpowerUsage()
+ 
+ void Console::lorafrqUsage()
+ {
+-  printf("'lorafrq VAL'  - sets the frequency for the LoRa transceiver,\r\n");
++  printf("'preset N'     - Funkprofil waehlen (0 EU Narrow, 1 Nah/Schnell, 2 Mittel, 3 Fern, 4 LongFast-aehnlich)\r\n");
++  printf("'lorafrq VAL'  - (veraltet) wie 'preset',\r\n");
+   printf("                 where VAL is desired frequency in MHz\r\n\r\n");
+ }
+ 
+@@ -155,10 +157,15 @@ void Console::txpowerSet(std::vector<char *> args)
+ 
+ void Console::lorafrqSet(std::vector<char *> args)
+ {
+-  int value;
+-
++  // Frequenz/Bandbreite/SF/CR kommen jetzt aus dem Funkprofil
++  int value = -1;
+   sscanf(&args[2][0], "%d", &value);
+-  saveLoraFrq(value);
++  if (value < 0 || value >= RADIO_PRESET_COUNT) {
++    printf("Funkprofil 0..%d erwartet: '/set preset N' (0 = EU Narrow)\r\n", RADIO_PRESET_COUNT - 1);
++    return;
++  }
++  saveRadioPreset(value);
++  printf("Funkprofil %d (%s) gespeichert, Neustart ...\r\n", value, getRadioPreset(value).name);
+   delay(500);
+   ESP.restart();
+ }
+@@ -170,12 +177,11 @@ void Console::sfSet(std::vector<char *> args)
+   int value;
+ 
+   sscanf(&args[2][0], "%d", &value);
+-  if((value < 6) || (value > 12)){
+-    printf("Invalid value provided, type '/set sf VAL'\r\n");
+-    sfUsage();
++  if (true) {
++    // Spreizfaktor ist Teil des Funkprofils (alle Knoten muessen gleich sein)
++    printf("SF wird ueber das Funkprofil gesetzt: '/set preset N'\r\n");
+   }
+   else{
+-    saveSpreadingFactor(value);
+     memcpy(response.destination, BROADCAST, ADDR_LENGTH);
+     response.type = 'i';
+     msgLen = sprintf((char *)response.message, "sf %d", value);
+@@ -258,6 +264,10 @@ void Console::set(std::vector<char *> args)
+     printf("No value provided, type '/set txpower VAL'\r\n");
+     txpowerUsage();
+   }
++  else if ((strncmp(&args[1][0], "preset", 6) == 0) && (args.size() > 2))
++  {
++    lorafrqSet(args);
++  }
+   else if ((strncmp(&args[1][0], "lorafrq", 7) == 0) && (args.size() > 2))
+   {
+     lorafrqSet(args);
+diff --git a/firmware/src/settings/settings.cpp b/firmware/src/settings/settings.cpp
+index 84692ee..7ed000b 100644
+--- a/firmware/src/settings/settings.cpp
++++ b/firmware/src/settings/settings.cpp
+@@ -10,6 +10,7 @@ int spreadingFactor = 9;
+ double dutyCycle = .1;
+ long routeInterval = 10000;
+ long beaconPeriod = 0;
++int radioPreset = 0; // 0 = EU Narrow (869,618 MHz, 62,5 kHz, SF8, CR 4/8)
+ 
+ void getSettings(void)
+ {
+@@ -47,6 +48,8 @@ void getSettings(void)
+   routeInterval = preferences.getLong("interval", routeInterval);
+   Serial.printf("Got interval setting %ld\n", routeInterval);
+   beaconPeriod = preferences.getLong("gps", beaconPeriod);
++  radioPreset = preferences.getInt("preset", radioPreset);
++  Serial.printf("Got preset setting %d\n", radioPreset);
+   Serial.printf("Got gps setting %ld\n", beaconPeriod);
+ 
+   preferences.end();
+@@ -156,3 +159,14 @@ void saveGPS(long period)
+   preferences.putLong("gps", period);
+   preferences.end();
+ }
++
++void saveRadioPreset(int preset)
++{
++  if (!preferences.begin("dr", false))
++  {
++    Serial.println("Error opening preferences");
++    return;
++  }
++  preferences.putInt("preset", preset);
++  preferences.end();
++}
+diff --git a/firmware/src/settings/settings.h b/firmware/src/settings/settings.h
+index 6cf72c9..e0501f4 100644
+--- a/firmware/src/settings/settings.h
++++ b/firmware/src/settings/settings.h
+@@ -11,6 +11,7 @@ void saveSpreadingFactor(int spreadFactor);
+ void saveDutyCycle(double dutyCycle);
+ void saveInterval(long interval);
+ void saveGPS(long period);
++void saveRadioPreset(int preset);
+ 
+ extern String username;
+ extern bool useBLE;
+@@ -20,3 +21,4 @@ extern int spreadingFactor;
+ extern double dutyCycle;
+ extern long routeInterval;
+ extern long beaconPeriod;
++extern int radioPreset; // Index in RADIO_PRESETS (RadioPresets.h)
+diff --git a/tools/ANLEITUNG.template.md b/tools/ANLEITUNG.template.md
+index 767cc2a..e2d3d3c 100644
+--- a/tools/ANLEITUNG.template.md
++++ b/tools/ANLEITUNG.template.md
+@@ -1,8 +1,8 @@
+-# DisAHRsterRadio für @BOARD@
++# HaldenFunk für @BOARD@
+ 
+-Version @VERSION@ (Commit @COMMIT@) · Quelle: https://github.com/Pietwars/DisAHRsterRadio
++Version @VERSION@ (Commit @COMMIT@) · Quelle: https://github.com/Pietwars/HaldenFunk
+ 
+-> ⚠️ Kein zertifiziertes Notrufsystem. In Lebensgefahr immer **112** wählen. Diese Version ist auf echter Hardware **nicht abgenommen** (frühere Stände liefen beim Nutzer auf einem LILYGO T3 V1.6.1).
++> ⚠️ Kein zertifiziertes Notrufsystem. In Lebensgefahr immer **112** wählen. Diese Version ist auf echter Hardware **nicht abgenommen** (die gleiche Basis lief bei DisAHRsterRadio auf einem LILYGO T3 V1.6.1).
+ 
+ ## 1. Zuerst die Antenne!
+ 
+@@ -13,7 +13,7 @@ Version @VERSION@ (Commit @COMMIT@) · Quelle: https://github.com/Pietwars/DisAH
+ 1. Board per USB-Datenkabel an den Rechner (Chrome oder Edge am PC/Mac, nicht iPhone).
+ 2. https://espressif.github.io/esptool-js/ öffnen, Baudrate 921600 (bei Problemen 115200), **Connect** und den Port wählen.
+    - T3-S3: Wird kein Port gefunden, **BOOT** gedrückt halten, kurz **RST** drücken, BOOT loslassen.
+-3. Bei **Flash Address** `0x0` eintragen und `DisAHRsterRadio-@ZIP@-factory.bin` wählen.
++3. Bei **Flash Address** `0x0` eintragen und `HaldenFunk-@ZIP@-factory.bin` wählen.
+ 4. Optional zuerst **Erase Flash** (löscht alles, auch gespeicherte Aushänge und das WLAN-Passwort).
+ 5. **Program** und warten, bis „Leaving…“ erscheint. Dann **RST** drücken oder kurz vom Strom trennen.
+ 
+@@ -26,7 +26,7 @@ Jedes Gerät erzeugt beim ersten Start ein **eigenes Zufallspasswort**. So komms
+ 1. In esptool-js auf **Disconnect**, dann unten im Bereich **Console** mit **115200** Baud verbinden (oder ein anderer serieller Monitor mit 115200).
+ 2. **RST** drücken. Es erscheint:
+    ```
+-   WLAN: DisAHRsterRadio-XXXXXX
++   WLAN: HaldenFunk-XXXXXX
+    Passwort: xxxxxxxxxxxx
+    Browser: http://192.168.4.1
+    ```
+@@ -46,7 +46,7 @@ Nur wenn sich Weboberfläche oder Karten geändert haben: zusätzlich `teile/lit
+ 
+ | Datei | Adresse |
+ |---|---|
+-| `DisAHRsterRadio-@ZIP@-factory.bin` | 0x0 (komplett) |
++| `HaldenFunk-@ZIP@-factory.bin` | 0x0 (komplett) |
+ | `teile/bootloader.bin` | @BOOT@ |
+ | `teile/partitions.bin` | 0x8000 |
+ | `teile/boot_app0.bin` | 0xe000 |
+diff --git a/tools/build_pages.py b/tools/build_pages.py
+index dfd0744..5d69ef6 100644
+--- a/tools/build_pages.py
++++ b/tools/build_pages.py
+@@ -11,10 +11,10 @@ for gz in (OUT/'map').glob('*.json.gz'):
+     (OUT/'map'/gz.name[:-3]).write_bytes(gzip.decompress(gz.read_bytes()))
+ html=(OUT/'index.html').read_text(encoding='utf-8')
+ force='<script>if(!/demo/.test(location.search))location.replace("?demo=1"+location.hash)</script>'
+-banner=('<div style="background:#f0d5a0;color:#3b2a1f;text-align:center;'
+-        'font:600 12px/16px system-ui,sans-serif;padding:6px 8px;height:28px;box-sizing:border-box;white-space:nowrap;overflow:hidden">Demo '+VERSION+' · simulierte Daten · '
+-        '<a style="color:#3b2a1f" href="https://github.com/Pietwars/DisAHRsterRadio">Quellcode</a> · '
+-        '<a style="color:#3b2a1f" href="flyer/DisAHRsterRadio-Flyer-digital.pdf">Flyer</a></div>')
++banner=('<div style="background:#c87533;color:#1a0f08;text-align:center;'
++        'font:600 13px/16px system-ui,sans-serif;padding:6px 8px;height:28px;box-sizing:border-box;white-space:nowrap;overflow:hidden">Demo '+VERSION+' – simulierte Daten · '
++        '<a style="color:#1a0f08" href="https://github.com/Pietwars/HaldenFunk">Quellcode &amp; Firmware</a> · '
++        '<a style="color:#1a0f08" href="flyer/HaldenFunk-Flyer-digital.pdf">Flyer</a></div>')
+ html=html.replace('<head>','<head>'+force,1)
+ i=html.index('<body'); j=html.index('>',i)+1
+ html=html[:j]+banner+html[j:]
+diff --git a/tools/make_map.py b/tools/make_map.py
+index c19346e..292d5ff 100644
+--- a/tools/make_map.py
++++ b/tools/make_map.py
+@@ -58,13 +58,6 @@ def conv(fn, name, keep_buildings):
+         L.append(row)
+     out = {'name': name, 'attr': d.get('attribution', '© OpenStreetMap contributors · ODbL 1.0'),
+            'bbox': d.get('bbox'), 'view': d.get('viewBounds') or d.get('bbox'), 'l': L, 'p': P}
+-    if not out['bbox']:  # GeoJSON ohne bbox: Grenzen aus Orten/POIs und Linien ohne Gewässer (Ahr/Bäche reichen weit über den Ausschnitt hinaus)
+-        xs, ys = [p[2] for p in P], [p[3] for p in P]
+-        for l in L:
+-            if l[0] in ('w', 's', 'wa'): continue
+-            x, y = l[1], l[2]; xs.append(x); ys.append(y)
+-            for i in range(3, len(l) - 1, 2): x += l[i]; y += l[i + 1]; xs.append(x); ys.append(y)
+-        out['bbox'] = out['view'] = [round(min(xs) / 1e5, 5), round(min(ys) / 1e5, 5), round(max(xs) / 1e5, 5), round(max(ys) / 1e5, 5)]
+     raw = json.dumps(out, ensure_ascii=False, separators=(',', ':')).encode()
+     os.makedirs(OUT, exist_ok=True)
+     base = os.path.join(OUT, fn.replace('.geojson', '.json'))
+diff --git a/tools/package.sh b/tools/package.sh
+index 305787e..1bcd96e 100755
+--- a/tools/package.sh
++++ b/tools/package.sh
+@@ -5,7 +5,7 @@ set -euo pipefail
+ ROOT=$(cd "$(dirname "$0")/.." && pwd)
+ OUT=${1:-$ROOT/dist}
+ FW=$ROOT/firmware
+-NAMEPREFIX=${NAMEPREFIX:-DisAHRsterRadio}
++NAMEPREFIX=${NAMEPREFIX:-HaldenFunk}
+ ESPTOOL=${ESPTOOL:-"python3 -m esptool"}
+ VERSION=$(python3 "$ROOT/tools/version.py" --get)   # zentrale Versionsquelle: Datei VERSION
+ COMMIT=$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || echo unbekannt)
+diff --git a/tools/shrink_maps.py b/tools/shrink_maps.py
+index 8d93532..1cfbd63 100755
+--- a/tools/shrink_maps.py
++++ b/tools/shrink_maps.py
+@@ -1,15 +1,13 @@
+ #!/usr/bin/env python3
+-"""Verkleinert die Offline-Karten (web/static/map/*.json.gz) fuer knappen Flash (aus HaldenFunk, gemeinsam genutzt).
++"""HaldenFunk: verkleinert die Offline-Karten (web/static/map/*.json.gz) fuer knappen Flash.
+ Douglas-Peucker-Vereinfachung, Raster-Rundung, Zuschnitt auf die Kartengrenzen, kleine Flaechen/Kurzstrecken weg.
+-Format bleibt kompatibel (Koordinaten in 1e-5 Grad, Delta-kodiert); Orte/POIs (Feld "p") bleiben unveraendert und vollstaendig,
+-Halden bzw. Weinberge ('v') werden feiner vereinfacht, Gebaeude ('b') nur um ~1 m."""
++Format bleibt kompatibel (Koordinaten in 1e-5 Grad, Delta-kodiert); Orte, Halden, Schaechte bleiben vollstaendig."""
+ import json, gzip, sys, math, zlib
+ from pathlib import Path
+ 
+ # Parameter je Karte: tol = DP-Toleranz (1e-5 Grad, ~1,1 m Breite), grid = Rundungsraster, minA = Mindestflaeche (m^2) Flaechen, minL = Mindestlaenge (m) Linien
+ PROFILE = {
+  'mansfelder-land': dict(tol=22, grid=6, minA={'wd': 15000, 'wa': 2000, 'v': 0}, minL={'s': 300, 'h': 0, 'w': 0, 'rw': 0}, drop=()),
+- 'ahrtal':          dict(tol=22, grid=6, minA={'wd': 15000, 'wa': 2000, 'v': 0}, minL={'s': 300, 'r': 150, 'h': 0, 'w': 0, 'rw': 0}, drop=()),
+  '_detail':         dict(tol=5, grid=2, minA={'wd': 1500, 'wa': 300, 'v': 0}, minL={'f': 25, 'r': 0, 's': 60}, drop=()),
+ }
+ FILL = {'wd', 'v', 'wa', 'b'}
+@@ -42,15 +40,7 @@ def clip_runs(pts, bb):  # Linie in Abschnitte innerhalb der (leicht erweiterten
+ def shrink(d, prof):
+     q = d.get('q', 1)
+     tol, g = prof['tol'], prof['grid']
+-    b = d.get('bbox') or d.get('view')
+-    if not b:  # Grenzen aus Orten/POIs und Linien ohne Gewässer bestimmen (wie tools/make_map.py)
+-        xs, ys = [p[2] * q for p in d.get('p', [])], [p[3] * q for p in d.get('p', [])]
+-        for l in d['l']:
+-            if l[0] in ('w', 's', 'wa'): continue
+-            x, y = l[1] * q, l[2] * q; xs.append(x); ys.append(y)
+-            for i in range(3, len(l) - 1, 2): x += l[i] * q; y += l[i + 1] * q; xs.append(x); ys.append(y)
+-        b = [min(xs) / 1e5, min(ys) / 1e5, max(xs) / 1e5, max(ys) / 1e5]
+-    m = 0.01; bb = [(b[0] - m) * 1e5, (b[1] - m) * 1e5, (b[2] + m) * 1e5, (b[3] + m) * 1e5]
++    b = d['bbox']; m = 0.01; bb = [(b[0] - m) * 1e5, (b[1] - m) * 1e5, (b[2] + m) * 1e5, (b[3] + m) * 1e5]
+     k = math.cos(math.radians((b[1] + b[3]) / 2)); mx = 1.113 * k; my = 1.113  # Meter je Einheit
+     L = []
+     for l in d['l']:
+@@ -66,8 +56,8 @@ def shrink(d, prof):
+         else:
+             runs = clip_runs(pts, bb)
+         for r in runs:
+-            r = dp(r, tol / 4 if t == 'v' else 1 if t == 'b' else tol, k)  # Halden/Weinberge feiner, Gebaeude nur ~1 m
+-            gg = 1 if t in ('v', 'b') else g
++            r = dp(r, tol / 4 if t == 'v' else tol, k)  # Halden feiner
++            gg = 1 if t == 'v' else g
+             r = [(round(p[0] / gg) * gg, round(p[1] / gg) * gg) for p in r]
+             r = [p for i, p in enumerate(r) if i == 0 or p != r[i - 1]]
+             if len(r) < 2 or (t in FILL and len(r) < 3): continue
+@@ -78,12 +68,9 @@ def shrink(d, prof):
+             for i in range(1, len(r)): row += [r[i][0] - r[i - 1][0], r[i][1] - r[i - 1][1]]
+             L.append(row)
+     d = dict(d); d.pop('q', None); d['l'] = L
+-    if not d.get('bbox'): d['bbox'] = [round(v, 5) for v in b]  # fehlende Grenzen ergänzen (Renderer braucht bbox)
+-    if not d.get('view'): d['view'] = d['bbox']
+     return d
+ 
+ # Aufruf: tools/shrink_maps.py <Ordner mit Rohkarten> <Zielordner, z. B. web/static/map>
+-# Ahrtal: python3 tools/make_map.py <DisasterMesh/maps> /tmp/roh && python3 tools/shrink_maps.py /tmp/roh web/static/map
+ if __name__ == "__main__":
+     src, dst = Path(sys.argv[1]), Path(sys.argv[2]); dst.mkdir(parents=True, exist_ok=True)
+     for f in sorted(src.glob('*.json.gz')):
+diff --git a/web/static/index.html b/web/static/index.html
+index bb7dd12..d49f2f3 100644
+--- a/web/static/index.html
++++ b/web/static/index.html
+@@ -1,46 +1,46 @@
+ <!doctype html>
+ <html lang="de"><head><meta charset="utf-8">
+ <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+-<title>DisAHRsterRadio · Ahrtal</title>
++<title>HaldenFunk · Glück Auf – Mesh fürs Mansfelder Land</title>
+ <link rel="icon" href="icon.png">
+ <style>
+-:root{font-family:system-ui,-apple-system,sans-serif;color:#eaf2f7;color-scheme:dark;--line:#294b3d;--mesh:#9ee576;--sage:#b7d6b7;--wine:#b7506b;--card:#14263ad9}
+-*{box-sizing:border-box}body{margin:0;min-height:100vh;display:flex;flex-direction:column}html{background:#0b141c}
+-body::before{content:"";position:fixed;inset:0;z-index:-2;background:url(bg.jpg) top center/min(100vw,1083px) auto no-repeat,linear-gradient(#0b141cb8,#0b141cb8),url(bg.jpg) center 70%/cover no-repeat;background-image:image-set(url(bg.webp) type("image/webp"),url(bg.jpg) type("image/jpeg")),linear-gradient(#0b141cb8,#0b141cb8),image-set(url(bg.webp) type("image/webp"),url(bg.jpg) type("image/jpeg"))}
+-body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(180deg,#0b141c00 0,#0b141c00 min(24vw,260px),#0b141c66 min(40vw,430px),#0b141c33 100%)}
++:root{font-family:system-ui,-apple-system,sans-serif;color:#f3ebe3;color-scheme:dark;--line:#5a4034;--mesh:#e8955a;--sage:#e3c39d;--wine:#b7506b;--card:#2a2220d9}
++*{box-sizing:border-box}body{margin:0;min-height:100vh;display:flex;flex-direction:column}html{background:#141214}
++body::before{content:"";position:fixed;inset:0;z-index:-2;background:url(bg.jpg) top center/min(100vw,1083px) auto no-repeat,linear-gradient(#141214b8,#141214b8),url(bg.jpg) center 70%/cover no-repeat;background-image:image-set(url(bg.webp) type("image/webp"),url(bg.jpg) type("image/jpeg")),linear-gradient(#141214b8,#141214b8),image-set(url(bg.webp) type("image/webp"),url(bg.jpg) type("image/jpeg"))}
++body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(180deg,#14121400 0,#14121400 min(24vw,260px),#14121466 min(40vw,430px),#14121433 100%)}
+ @media (min-width:900px){body{max-width:900px;margin:0 auto;width:100%}}
+-header{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:8px;padding:8px 12px;background:#0b141ccc;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+-header .t{flex:1}header h1{margin:0;font-size:1.15rem;line-height:1.1}header small{color:var(--sage)}
++header{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:8px;padding:8px 12px;background:#141214cc;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
++header .t{flex:1}header h1{margin:0;font-size:1.2rem;line-height:1.1;color:#e8955a;letter-spacing:.02em}header{border-bottom:2px solid #b8693a}header small{color:var(--sage)}
+ #st{padding:3px 9px;border-radius:12px;font-size:.8rem;background:#0008}
+ #st.ok{color:var(--mesh)}#st.bad{color:#ff9aa8}.heaplow{color:#ff9aa8;font-weight:600}
+ .warn{background:#3a1d26cc;border-left:4px solid var(--wine);padding:6px 10px;font-size:.85rem}
+-nav{display:flex;background:#0b141cb0;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border-bottom:1px solid var(--line);overflow-x:auto}nav button{flex:1 0 auto;background:none;border:0;color:#cfe;padding:10px 6px;font-size:.95rem;border-bottom:3px solid transparent}
++nav{display:flex;background:#141214b0;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border-bottom:1px solid var(--line);overflow-x:auto}nav button{flex:1 0 auto;background:none;border:0;color:#f0dcc8;padding:10px 6px;font-size:.95rem;border-bottom:3px solid transparent}
+ nav button.on{border-color:var(--mesh);color:var(--mesh)}
+-main{flex:1;display:flex;flex-direction:column;min-height:0}section{display:none;padding:10px;margin:8px;border-radius:12px;background:#0b141c59;flex:1;flex-direction:column;gap:8px}section.on{display:flex}
++main{flex:1;display:flex;flex-direction:column;min-height:0}section{display:none;padding:10px;margin:8px;border-radius:12px;background:#14121459;flex:1;flex-direction:column;gap:8px}section.on{display:flex}
+ #log{flex:1;overflow-y:auto;min-height:200px;display:flex;flex-direction:column;gap:5px}
+-.m{background:var(--card);border-radius:8px;padding:6px 9px;max-width:92%;word-wrap:break-word}.m.self{align-self:flex-end;background:#1f3d2cdd}.m.sys{align-self:center;background:#0b141c99;color:#9ab;font-size:.85rem}
++.m{background:var(--card);border-radius:8px;padding:6px 9px;max-width:92%;word-wrap:break-word}.m.self{align-self:flex-end;background:#5a3420dd}.m.sys{align-self:center;background:#14121499;color:#9ab;font-size:.85rem}
+ .m .n{color:var(--mesh);font-weight:600;margin-right:4px}.m .tm{color:#789;font-size:.7rem;margin-left:6px}.m .pend{color:#fc6}
+-form{display:flex;gap:6px}input,select,textarea{flex:1;background:#0b141c;color:#eaf2f7;border:1px solid var(--line);border-radius:8px;padding:9px;font-size:1rem}
+-button.b{background:var(--mesh);color:#102;border:0;border-radius:8px;padding:9px 14px;font-weight:600;font-size:1rem}button.b2{background:#24384a;color:#eaf2f7}
+-.quick-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}.quick-btn{background:var(--card);color:#eaf2f7;border:1px solid var(--line);border-radius:10px;padding:12px 8px;font-size:.95rem;text-align:left}.quick-btn b{display:block;font-size:1.4rem}
++form{display:flex;gap:6px}input,select,textarea{flex:1;background:#141214;color:#f3ebe3;border:1px solid var(--line);border-radius:8px;padding:9px;font-size:1rem}
++button.b{background:var(--mesh);color:#1a0f08;border:0;border-radius:8px;padding:9px 14px;font-weight:600;font-size:1rem}button.b2{background:#3a2e2a;color:#f3ebe3}
++.quick-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}.quick-btn{background:var(--card);color:#f3ebe3;border:1px solid var(--line);border-radius:10px;padding:12px 8px;font-size:.95rem;text-align:left}.quick-btn b{display:block;font-size:1.4rem}
+ .quick-btn.H{border-left:4px solid var(--wine)}.quick-btn.I{border-left:4px solid #6ab0e0}.quick-btn.A{border-left:4px solid var(--mesh)}
+ .muted{color:#9ab;font-size:.85rem;margin:0}.places{display:flex;flex-direction:column;gap:4px}.places button{text-align:left}
+-table{border-collapse:collapse;font-size:.9rem}td{padding:3px 8px;border-bottom:1px solid #1d3346}
++table{border-collapse:collapse;font-size:.9rem}td{padding:3px 8px;border-bottom:1px solid #3a2e2a}
+ h2{margin:4px 0;font-size:1.05rem}
+-.post{background:var(--card);border-radius:10px;padding:8px 10px;border-left:4px solid #3c5a6e}.post.pin{border-left-color:#ffb84d;background:#2a2618}
++.post{background:var(--card);border-radius:10px;padding:8px 10px;border-left:4px solid #6b5448}.post.pin{border-left-color:#ffb84d;background:#2a2618}
+ .post .h{font-size:.78rem;color:#9ab;display:flex;justify-content:space-between;gap:6px}.post .tx{margin-top:3px;white-space:pre-wrap;word-wrap:break-word}
+ #posts{display:flex;flex-direction:column;gap:6px;overflow-y:auto;flex:1}
+ .row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.row label{font-size:.9rem;display:flex;gap:4px;align-items:center}.row select{flex:0 1 auto}
+-#mapwrap{position:relative;flex:1;min-height:340px;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#0d1a22;touch-action:none}
++#mapwrap{position:relative;flex:1;min-height:340px;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#17151a;touch-action:none}
+ #cv{position:absolute;inset:0;width:100%;height:100%}#mapattr{position:absolute;right:4px;bottom:2px;font-size:.62rem;color:#9ab;background:#0009;padding:1px 4px}
+ #mapctl{position:absolute;left:6px;top:6px;display:flex;flex-direction:column;gap:4px}#mapctl button{width:34px;height:34px;padding:0;font-size:1.1rem}
+ .legend{font-size:.78rem;color:#9ab;display:flex;gap:10px;flex-wrap:wrap}.legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:3px;vertical-align:-1px}
+ section h2,section p,.row label{text-shadow:0 1px 3px #000,0 0 8px #000}
+ .hero{height:min(24vw,260px);flex:none}
+-@media (min-width:1100px){body::before{background:linear-gradient(#0b141c00 560px,#0b141c 722px) top center/100% 100% no-repeat,linear-gradient(90deg,#0b141c,#0b141c00 3%,#0b141c00 97%,#0b141c) top center/1083px 722px no-repeat,url(bg.webp) top center/1083px auto no-repeat,#0b141c}}
++@media (min-width:1100px){body::before{background:linear-gradient(#14121400 560px,#141214 722px) top center/100% 100% no-repeat,linear-gradient(90deg,#141214,#14121400 3%,#14121400 97%,#141214) top center/1083px 722px no-repeat,url(bg.webp) top center/1083px auto no-repeat,#141214}}
+ </style></head><body>
+ <div class="hero" aria-hidden="true"></div>
+-<header><div class="t"><h1>DisAHRsterRadio</h1><small>Ahrtal · LoRa-Mesh ohne Internet</small></div><div id="st" class="bad">getrennt</div></header>
++<header><div class="t"><h1>⚒ HaldenFunk</h1><small>Glück Auf – Mesh fürs Mansfelder Land</small></div><div id="st" class="bad">getrennt</div></header>
+ <div class="warn">Kein zertifiziertes Notrufsystem. In Lebensgefahr immer <b>112</b> wählen, wenn irgendwie möglich.</div>
+ <nav><button data-tab="chat" class="on">Chat</button><button data-tab="quick">Schnellmeldung</button><button data-tab="board">Brett</button><button data-tab="map">Karte</button><button data-tab="loc">Standort</button><button data-tab="info">Gerät</button></nav>
+ <main>
+@@ -55,18 +55,20 @@ section h2,section p,.row label{text-shadow:0 1px 3px #000,0 0 8px #000}
+ <div id="posts"></div>
+ <textarea id="btext" rows="3" maxlength="170" placeholder="Aushang, z. B. „Trinkwasser-Ausgabe am Rathaus 14–17 Uhr“"></textarea>
+ <div class="row"><label><input type="checkbox" id="bpin"> Wichtig / anheften</label><select id="bttl"><option value="360">6 Stunden</option><option value="1440" selected>1 Tag</option><option value="4320">3 Tage</option><option value="10080">7 Tage</option></select><button class="b" id="bsend" type="button">Aushängen</button></div></section>
+-<section id="map"><div class="row"><select id="mapsel"><option value="ahrtal">Ahrtal (Übersicht)</option><option value="heimersheim">Heimersheim (Detail)</option><option value="dernau">Dernau · Ahrweiler</option><option value="altenahr">Altenahr · Mayschoß · Rech</option><option value="sinzig">Sinzig</option></select><button class="b b2" id="mapme" type="button">📍 Ich</button><button class="b b2" id="mapfit" type="button">Alles</button></div>
++<section id="map"><div class="row"><select id="mapsel"><option value="mansfelder-land">Mansfelder Land (Übersicht)</option><option value="sangerhausen">Sangerhausen (Detail)</option><option value="eisleben">Lutherstadt Eisleben</option><option value="mansfeld-hettstedt">Mansfeld · Hettstedt</option><option value="kelbra-kyffhaeuser">Kelbra · Roßla · Kyffhäuser</option></select><button class="b b2" id="mapme" type="button">📍 Ich</button><button class="b b2" id="mapfit" type="button">Alles</button></div>
+ <div id="mapwrap"><canvas id="cv"></canvas><div id="mapctl"><button class="b b2" id="zin" type="button">+</button><button class="b b2" id="zout" type="button">−</button></div><div id="mapattr">© OpenStreetMap-Mitwirkende · ODbL</div></div>
+-<div class="legend"><span><i style="background:#9ee576"></i>ich</span><span><i style="background:#6ab0e0"></i>gemeldete Positionen</span><span><i style="background:#ffb84d"></i>Brett</span><span><i style="background:#ff7d8f"></i>Apotheke/Arzt</span><span><i style="background:#4dd2ff"></i>Wasser</span></div>
++<div class="legend"><span><i style="background:#e8955a"></i>ich</span><span><i style="background:#6ab0e0"></i>gemeldete Positionen</span><span><i style="background:#ffb84d"></i>Brett</span><span><i style="background:#ff7d8f"></i>Apotheke/Arzt</span><span><i style="background:#c87533"></i>Schacht</span><span><i style="background:#4dd2ff"></i>Wasser</span></div>
+ <p class="muted" id="mapinfo">Positionen aus Chat- und Brett-Nachrichten (Koordinaten im Text) werden angezeigt. Keine Navigation.</p></section>
+ <section id="loc"><h2>Standort</h2><p class="muted">GPS des Telefons funktioniert im Browser oft nur über HTTPS. Sonst bitte Ort aus der Liste wählen.</p>
+ <form id="gf" onsubmit="return false"><button class="b b2" id="gps" type="button">📍 GPS-Position holen</button></form>
+-<p id="gpsres" class="muted"></p><h2>Orte im Ahrtal</h2><div class="places" id="pl"></div></section>
++<p id="gpsres" class="muted"></p><h2>Orte im Mansfelder Land &amp; am Harzrand</h2><div class="places" id="pl"></div></section>
+ <section id="info"><h2>Gerät</h2><table id="it"></table>
+-<p class="muted">Basiert auf <a href="https://github.com/sudomesh/disaster-radio" style="color:var(--sage)">sudomesh/disaster-radio</a> (GPLv3/AGPLv3).</p><p class="muted" id="uiver">Weboberfläche DisAHRsterRadio 0.0.0-dev</p></section>
++<h2>Funkprofil</h2><p class="muted">⚠ Alle Geräte im Netz müssen <b>dasselbe Funkprofil</b> nutzen, sonst hören sie sich nicht. Alle Profile liegen im Teilband 869,4–869,65 MHz (max. 500 mW ERP, 10 % Sendezeit pro Stunde – die Firmware hält Pakete zurück, wenn das Budget aufgebraucht ist). Änderung startet das Gerät neu.</p>
++<form id="pf" onsubmit="return false" style="display:block"><select id="psel" class="b b2" style="width:100%;max-width:100%;margin-bottom:8px;font-size:15px"></select><button class="b" id="pset" type="button" style="width:100%">Übernehmen &amp; neu starten</button></form><p id="pres" class="muted"></p>
++<p class="muted">Basiert auf <a href="https://github.com/sudomesh/disaster-radio" style="color:var(--sage)">sudomesh/disaster-radio</a> (GPLv3/AGPLv3). Regionalvariante von <a href="https://github.com/Pietwars/DisAHRsterRadio" style="color:var(--sage)">DisAHRsterRadio</a>.</p><p class="muted" id="uiver">Weboberfläche HaldenFunk 0.0.0-dev</p></section>
+ </main>
+ <script>
+-const PLACES=[['Ahrweiler',50.5430,7.0965],['Bad Bodendorf',50.5579,7.2200],['Bad Neuenahr',50.5449,7.1377],['Dernau',50.5344,7.0435],['Heimersheim',50.5426,7.1761],['Heppingen',50.5512,7.1646],['Kripp (Ahrmündung)',50.5609,7.2691],['Lohrsdorf',50.5515,7.1865],['Mayschoß',50.5220,7.0198],['Rech',50.5132,7.0369],['Sinzig',50.5452,7.2491],['Walporzheim',50.5312,7.0794]];
++const PLACES=[['Allstedt',51.4019,11.3867],['Hettstedt',51.6496,11.5115],['Kelbra (Kyffhäuser)',51.4353,11.0390],['Kyffhäuser-Denkmal',51.4128,11.1078],['Lutherstadt Eisleben',51.5279,11.5480],['Mansfeld',51.5960,11.4540],['Roßla',51.4640,11.0750],['Sangerhausen',51.4729,11.2979],['Sangerhausen – Hohe Linde (Halde)',51.4880,11.3290],['Stolberg (Harzrand)',51.5745,10.9563],['Wallhausen',51.4580,11.2050],['Wippra (Harzrand)',51.5710,11.2770]];
+ const QUICK=[['H','Trinkwasser benötigt, Personen: ','💧','Trinkwasser'],['H','Strom zum Laden benötigt (Handy/Gerät)','⚡','Strom / Laden'],['H','Medikamente benötigt: ','💊','Medikamente'],['H','Verletzte Person, Hilfe benötigt','🚑','Verletzt'],['I','Evakuierung / Sammelpunkt: ','🏃','Evakuierung'],['I','Mir geht es gut, bin hier erreichbar','✅','Mir geht es gut'],['A','Biete Hilfe an: ','🤝','Ich biete Hilfe'],['A','Strom/Ladestation verfügbar','🔋','Strom vorhanden']];
+ const KIND={H:'HILFE',I:'INFO',A:'ANGEBOT'};
+ const $=s=>document.querySelector(s),enc=new TextEncoder(),dec=new TextDecoder();
+@@ -103,12 +105,18 @@ $('#pl').onclick=e=>{const b=e.target.closest('button');if(!b)return;const p=PLA
+ $('#gps').onclick=()=>{if(!navigator.geolocation)return $('#gpsres').textContent='Kein GPS im Browser verfügbar.';$('#gpsres').textContent='Suche Position …';
+  navigator.geolocation.getCurrentPosition(p=>{myPos=p.coords.latitude.toFixed(5)+','+p.coords.longitude.toFixed(5)+' (±'+Math.round(p.coords.accuracy)+' m)';localStorage.setItem('dar-pos',myPos);setMe(p.coords.latitude,p.coords.longitude);$('#gpsres').textContent='Position: '+myPos;who()},
+  e=>{$('#gpsres').textContent='GPS nicht möglich ('+e.message+'). Bitte Ort aus der Liste wählen.'},{enableHighAccuracy:true,timeout:15000})};
+-async function info(){let d;try{d=DEMO?{name:'DisAHRsterRadio',version:'0.0.0-dev',board:'LILYGO T3-S3 SX1262',node:'a1b2c3d4',ssid:'DisAHRsterRadio-B2C3D4',lora:true,freq:869.525,sf:9,txPower:14,routes:2,clients:3,sd:false,uptime:4711,heap:151552,minHeap:118784,maxBlock:65524,heapWarn:40960}:await (await fetch('/api/info')).json()}catch(e){$('#it').innerHTML='<tr><td>Keine Gerätedaten</td></tr>';return}
+- const L={board:'Board',version:'Firmware',node:'Knotenadresse',ssid:'WLAN',lora:'LoRa aktiv',freq:'Frequenz (MHz)',sf:'Spreizfaktor',txPower:'Sendeleistung (dBm)',routes:'Routen',clients:'Verbundene Clients',sd:'SD-Karte',uptime:'Laufzeit (s)',heap:'Freier Speicher',minHeap:'Minimum seit Start',maxBlock:'Größter freier Block'};
++async function info(){let d;try{d=DEMO?{name:'HaldenFunk',version:'0.0.0-dev',board:'LILYGO T3-S3 SX1262',node:'a1b2c3d4',ssid:'HaldenFunk-B2C3D4',lora:true,preset:0,presetId:'eu-narrow',presetName:'EU Narrow (Standard)',freq:869.618,bw:62.5,sf:8,cr:'4/8',airtimeMs:12840,airtimeBudgetMs:360000,airtimePct:0.36,dutyLimitPct:10,txDeferred:0,txPower:14,routes:2,clients:3,sd:false,uptime:4711,heap:151552,minHeap:118784,maxBlock:65524,heapWarn:40960}:await (await fetch('/api/info')).json()}catch(e){$('#it').innerHTML='<tr><td>Keine Gerätedaten</td></tr>';return}
++ const L={board:'Board',version:'Firmware',node:'Knotenadresse',ssid:'WLAN',lora:'LoRa aktiv',presetName:'Funkprofil',freq:'Frequenz (MHz)',bw:'Bandbreite (kHz)',sf:'Spreizfaktor',cr:'Coderate',airtimeMs:'Sendezeit letzte Stunde',txDeferred:'Wegen Sendezeit zurückgehalten',txPower:'Sendeleistung (dBm)',routes:'Routen',clients:'Verbundene Clients',sd:'SD-Karte',uptime:'Laufzeit (s)',heap:'Freier Speicher',minHeap:'Minimum seit Start',maxBlock:'Größter freier Block'};
+  const W=d.heapWarn||40960,KB=v=>Math.round(v/1024)+' KB';
+- $('#it').innerHTML=Object.keys(L).filter(k=>d[k]!==undefined).map(k=>{const h=/^(heap|minHeap|maxBlock)$/.test(k),low=(k=='heap'||k=='minHeap')&&d[k]<W;return '<tr><td>'+L[k]+'</td><td'+(low?' class="heaplow"':'')+'>'+esc(h?KB(d[k])+(low?' ⚠ unter '+KB(W):''):String(d[k]===true?'ja':d[k]===false?'nein':d[k]))+'</td></tr>'}).join('')}
++ $('#it').innerHTML=Object.keys(L).filter(k=>d[k]!==undefined).map(k=>{const h=/^(heap|minHeap|maxBlock)$/.test(k),low=(k=='heap'||k=='minHeap')&&d[k]<W;return '<tr><td>'+L[k]+'</td><td'+(low?' class="heaplow"':'')+'>'+esc(h?KB(d[k])+(low?' ⚠ unter '+KB(W):''):(k=='airtimeMs'?(d[k]/1000).toFixed(1)+' s von '+Math.round((d.airtimeBudgetMs||360000)/1000)+' s ('+(d.airtimePct||0).toFixed(1)+' % / max. '+(d.dutyLimitPct||10)+' %)':String(d[k]===true?'ja':d[k]===false?'nein':d[k])))+'</td></tr>'}).join('')}
+ setInterval(()=>{if($('#info').classList.contains('on'))info()},10000);
+-function demo(){status(1);if(!name){name='Peter';}[ '~ Anna joined the channel','<Anna> Heimersheim: Wasser steht in der Bachstraße, Brücke gesperrt.','<Jonas> [HILFE] Trinkwasser benötigt, Personen: 4 @ Lohrsdorf (50.5515,7.1865)','<Peter> Bin auf dem Weg, bringe 2 Kanister mit.','<Mia> [ANGEBOT] Strom/Ladestation verfügbar @ Bad Neuenahr (50.5449,7.1377)'].forEach(t=>show(t,t.startsWith('<Peter>')?'self':''))}
++async function presets(){let l,cur=0;try{l=DEMO?[{i:0,id:'eu-narrow',name:'EU Narrow (Standard)',freq:869.618,bw:62.5,sf:8,cr:8,duty:10},{i:1,id:'nah',name:'Nah/Schnell',freq:869.525,bw:250,sf:7,cr:5,duty:10},{i:2,id:'mittel',name:'Mittel (bisheriger Standard)',freq:869.525,bw:125,sf:9,cr:5,duty:10},{i:3,id:'fern',name:'Fern',freq:869.525,bw:125,sf:12,cr:8,duty:10},{i:4,id:'longfast',name:'LongFast-aehnlich',freq:869.525,bw:250,sf:11,cr:5,duty:10}]:await (await fetch('/api/presets')).json();const d=DEMO?{preset:0}:await (await fetch('/api/info')).json();cur=d.preset||0}catch(e){return}
++ $('#psel').innerHTML=l.map(p=>'<option value="'+p.i+'"'+(p.i==cur?' selected':'')+'>'+esc(p.name)+' · '+String(p.freq).replace('.',',')+' MHz · '+String(p.bw).replace('.',',')+' kHz · SF'+p.sf+' · CR 4/'+p.cr+'</option>').join('')}
++$('#pset').onclick=async()=>{const v=$('#psel').value;if(!confirm('Funkprofil wechseln? Alle anderen Geräte im Netz müssen dasselbe Profil bekommen. Das Gerät startet neu.'))return;
++ if(DEMO){$('#pres').textContent='Demo: Profil gespeichert (kein Neustart).';return}
++ try{const r=await fetch('/api/preset',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'preset='+v});$('#pres').textContent=r.ok?'Gespeichert – Gerät startet neu, bitte in ca. 20 s neu verbinden.':'Fehler: '+await r.text()}catch(e){$('#pres').textContent='Gerät startet neu …'}};
++presets();
++function demo(){status(1);if(!name){name='Peter';}[ '~ Anna joined the channel','<Anna> Glück Auf! Sangerhausen: Strom seit 2 h weg, Netz down.','<Jonas> [HILFE] Trinkwasser benötigt, Personen: 4 @ Wallhausen (51.4580,11.2050)','<Peter> Bin auf dem Weg, bringe 2 Kanister mit.','<Mia> [ANGEBOT] Strom/Ladestation verfügbar @ Lutherstadt Eisleben (51.5279,11.5480)','<Karl> Knoten auf der Hohen Linde läuft, Reichweite bis Allstedt 👍'].forEach(t=>show(t,t.startsWith('<Peter>')?'self':''))}
+ 
+ /* ---------- Schwarzes Brett ---------- */
+ let posts={};
+@@ -132,26 +140,26 @@ function notePos(t,who,brett){const m=String(t).match(/(-?\d{1,2}\.\d{3,})\s*,\s
+ async function getMap(k){if(MAPS[k])return MAPS[k];let r=await fetch('map/'+k+'.json').catch(()=>null);let d;
+  if(r&&r.ok&&(r.headers.get('content-type')||'').includes('json'))d=await r.json();else{r=await fetch('map/'+k+'.json.gz');d=JSON.parse(await new Response(r.body.pipeThrough(new DecompressionStream('gzip'))).text())}
+  d.l.forEach(l=>{for(let i=3;i<l.length;i+=2){l[i]+=l[i-2];l[i+1]+=l[i-1]}});return MAPS[k]=d}
+-async function loadMap(k){k=k||$('#mapsel').value;try{$('#mapinfo').textContent='Karte wird geladen …';M=await getMap(k);fit();if(DEMO&&me&&k=='ahrtal'){view.la=me[0];view.lo=me[1];view.s=12000;drawMap()}$('#mapinfo').textContent=M.name+' · '+M.l.length+' Linien · Positionen aus Nachrichten: '+Object.keys(marks).length}catch(e){$('#mapinfo').textContent='Karte nicht verfügbar: '+e.message}}
++async function loadMap(k){k=k||$('#mapsel').value;try{$('#mapinfo').textContent='Karte wird geladen …';M=await getMap(k);fit();$('#mapinfo').textContent=M.name+' · '+M.l.length+' Linien · Positionen aus Nachrichten: '+Object.keys(marks).length}catch(e){$('#mapinfo').textContent='Karte nicht verfügbar: '+e.message}}
+ function size(){const r=$('#mapwrap').getBoundingClientRect(),d=devicePixelRatio||1;cv.width=r.width*d;cv.height=r.height*d;cx.setTransform(d,0,0,d,0,0);return r}
+ function fit(){const r=size(),b=M.view||M.bbox,k=Math.cos((b[1]+b[3])/2*Math.PI/180);const s=Math.min(r.width/((b[2]-b[0])*k),r.height/(b[3]-b[1]));view={lo:(b[0]+b[2])/2,la:(b[1]+b[3])/2,s:s*0.95,k};drawMap()}
+ function P(lo,la){const r=cv.width/(devicePixelRatio||1),h=cv.height/(devicePixelRatio||1);return[r/2+(lo-view.lo)*view.k*view.s,h/2-(la-view.la)*view.s]}
+-const ST={wd:['#163a26',0,1],v:['#3b3a1a',0,1],wa:['#1f4f74',0,1],b:['#3a4651',0,1],s:['#3d7fb0',1],w:['#4da3e0',3],f:['#54606a',.6],r:['#8a97a2',1],rw:['#b08ad0',1.4],h:['#e8c07a',2.2]};
+-const ORDER=['wd','v','wa','b','s','w','f','r','rw','h'];const PC={apo:'#ff7d8f',med:'#ff7d8f',h2o:'#4dd2ff',fw:'#ff5a3c',pol:'#7aa0ff',sh:'#c9b38a',shop:'#d6a0ff',amt:'#cccccc',wc:'#888',sch:'#999'};
+-function drawMap(){if(!M||!view||!cv.offsetParent)return;const W=cv.width/(devicePixelRatio||1),H=cv.height/(devicePixelRatio||1);cx.fillStyle='#0d1a22';cx.fillRect(0,0,W,H);
++const ST={wd:['#1f2e22',0,1],v:['#5a3b2a',0,1],wa:['#1f4f74',0,1],b:['#3a4651',0,1],s:['#3d7fb0',1],w:['#4da3e0',3],f:['#54606a',.6],r:['#8a97a2',1],rw:['#b08ad0',1.4],h:['#e8c07a',2.2]};
++const ORDER=['wd','v','wa','b','s','w','f','r','rw','h'];const PC={apo:'#ff7d8f',med:'#ff7d8f',h2o:'#4dd2ff',fw:'#ff5a3c',pol:'#7aa0ff',sh:'#c9b38a',shop:'#d6a0ff',amt:'#cccccc',wc:'#888',sch:'#999',shaft:'#c87533'};
++function drawMap(){if(!M||!view||!cv.offsetParent)return;const W=cv.width/(devicePixelRatio||1),H=cv.height/(devicePixelRatio||1);cx.fillStyle='#17151a';cx.fillRect(0,0,W,H);
+  const z=view.s/1e5,ppd=view.s;// Pixel pro Grad
+  for(const o of ORDER){const st=ST[o];if((o=='f'||o=='b')&&ppd<20000)continue;if(o=='r'&&ppd<6000)continue;cx.beginPath();
+   for(const l of M.l){if(l[0]!==o)continue;let [x,y]=P(l[1]/1e5,l[2]/1e5);cx.moveTo(x,y);for(let i=3;i<l.length;i+=2){[x,y]=P(l[i]/1e5,l[i+1]/1e5);cx.lineTo(x,y)}if(!st[1])cx.closePath()}
+   if(st[1]){cx.strokeStyle=st[0];cx.lineWidth=st[1]*Math.max(1,Math.min(2.5,ppd/15000));cx.stroke()}else{cx.fillStyle=st[0];cx.fill()}}
+  cx.font='12px system-ui';cx.textAlign='center';
+  for(const p of M.p){const [x,y]=P(p[2]/1e5,p[3]/1e5);if(x<-20||y<-20||x>W+20||y>H+20)continue;
+-  if(p[0].startsWith('pl:')){const big=/town|city/.test(p[0]),vil=/village|suburb/.test(p[0]);if(!big&&!(vil&&ppd>=6000)&&ppd<20000)continue;cx.fillStyle=big?'#eaf2f7':'#b7c7d0';cx.font=(big?'bold 13px':'11px')+' system-ui';cx.fillText(p[1],x,y)}
++  if(p[0].startsWith('pl:')){const big=/town|city/.test(p[0]),vil=/village|suburb/.test(p[0]);if(!big&&!(vil&&ppd>=6000)&&ppd<20000)continue;cx.fillStyle=big?'#f3ebe3':'#d8c8b8';cx.font=(big?'bold 13px':'11px')+' system-ui';cx.fillText(p[1],x,y)}
+   else if(ppd>9000){cx.fillStyle=PC[p[0]]||'#aaa';cx.beginPath();cx.arc(x,y,3.5,0,7);cx.fill();if(ppd>25000&&p[1]){cx.font='10px system-ui';cx.fillStyle='#cdd';cx.fillText(p[1].slice(0,24),x,y-6)}}}
+- if(ppd<8000)for(const q of PLACES){const [x,y]=P(q[2],q[1]);cx.fillStyle='#b7d6b7';cx.font='11px system-ui';cx.beginPath();cx.arc(x,y,2.5,0,7);cx.fill();cx.fillText(q[0],x,y-6)}
++ if(ppd<8000)for(const q of PLACES){const [x,y]=P(q[2],q[1]);cx.fillStyle='#e3c39d';cx.font='11px system-ui';cx.beginPath();cx.arc(x,y,2.5,0,7);cx.fill();cx.fillText(q[0],x,y-6)}
+  const pin=(la,lo,c,label)=>{const [x,y]=P(lo,la);cx.fillStyle=c;cx.strokeStyle='#000';cx.lineWidth=1.5;cx.beginPath();cx.arc(x,y,7,0,7);cx.fill();cx.stroke();
+-  cx.font='bold 12px system-ui';cx.textAlign='left';cx.lineWidth=3;cx.strokeStyle='#0d1a22';cx.strokeText(label,x+10,y+4);cx.fillStyle='#fff';cx.fillText(label,x+10,y+4);cx.textAlign='center'};
++  cx.font='bold 12px system-ui';cx.textAlign='left';cx.lineWidth=3;cx.strokeStyle='#17151a';cx.strokeText(label,x+10,y+4);cx.fillStyle='#fff';cx.fillText(label,x+10,y+4);cx.textAlign='center'};
+  for(const m of Object.values(marks))pin(m.la,m.lo,m.brett?'#ffb84d':'#6ab0e0',(m.brett?'📌 ':'')+m.n);
+- if(me)pin(me[0],me[1],'#9ee576','Ich')}
++ if(me)pin(me[0],me[1],'#e8955a','Ich')}
+ let pts=new Map(),last=null;
+ cv.onpointerdown=e=>{cv.setPointerCapture(e.pointerId);pts.set(e.pointerId,[e.clientX,e.clientY])};
+ cv.onpointermove=e=>{if(!pts.has(e.pointerId)||!view)return;const o=pts.get(e.pointerId);
+@@ -164,10 +172,10 @@ function zoom(f){if(!view)return;view.s=Math.max(2000,Math.min(400000,view.s*f))
+ $('#zin').onclick=()=>zoom(1.5);$('#zout').onclick=()=>zoom(1/1.5);$('#mapfit').onclick=()=>M&&fit();
+ $('#mapme').onclick=()=>{if(!me)return alert('Noch kein Standort – unter „Standort“ GPS holen oder Ort wählen.');view.la=me[0];view.lo=me[1];view.s=Math.max(view.s,30000);drawMap()};
+ $('#mapsel').onchange=()=>loadMap();addEventListener('resize',()=>{if(M&&view){size();drawMap()}});
+-function demoPosts(){return[{id:'a1b2c3d4',pinned:true,name:'Feuerwehr_Heimersheim',text:'Trinkwasser-Ausgabe am Bürgerhaus Heimersheim 14–17 Uhr (50.5426,7.1761). Kanister mitbringen.',ageMin:95,ttlMin:1350},
+- {id:'b2c3d4e5',pinned:false,name:'Anna',text:'Brücke Bachstraße gesperrt, Umweg über Lohrsdorf.',ageMin:40,ttlMin:1400},
+- {id:'c3d4e5f6',pinned:true,name:'Praxis_Dr_M',text:'Apotheke Bad Neuenahr Notdienst geöffnet bis 20 Uhr @ (50.5449,7.1377)',ageMin:180,ttlMin:600},
+- {id:'d4e5f6a7',pinned:false,name:'Jonas',text:'Suche Stromaggregat für Pumpe, Heppingen. Tel. über Chat.',ageMin:12,ttlMin:4300}]}
+-who();connect();if(DEMO){loadBoard();if(!me)me=[50.5440,7.1700]}
+-const h0=location.hash.slice(1);if(h0){const b=document.querySelector('nav button[data-tab="'+h0+'"]');if(b)b.click()}
++function demoPosts(){return[{id:'a1b2c3d4',pinned:true,name:'Feuerwehr_SGH',text:'Trinkwasser-Ausgabe am Markt Sangerhausen 14–17 Uhr @ (51.4729,11.2979). Kanister mitbringen.',ageMin:95,ttlMin:1350},
++ {id:'b2c3d4e5',pinned:false,name:'Anna',text:'B86 bei Hettstedt gesperrt, Umweg über Mansfeld.',ageMin:40,ttlMin:1400},
++ {id:'c3d4e5f6',pinned:true,name:'Praxis_Dr_M',text:'Apotheke Eisleben Notdienst geöffnet bis 20 Uhr @ (51.5279,11.5480)',ageMin:180,ttlMin:600},
++ {id:'d4e5f6a7',pinned:false,name:'Jonas',text:'Suche Stromaggregat für Pumpe, Kelbra. Tel. über Chat.',ageMin:12,ttlMin:4300}]}
++who();connect();if(DEMO){loadBoard();if(!me)me=[51.4729,11.2979]}
++const h0=(location.search.match(/[?&]tab=(\w+)/)||[])[1]||location.hash.slice(1);if(h0){const b=document.querySelector('nav button[data-tab="'+h0+'"]');if(b)b.click();setTimeout(()=>scrollTo(0,0),50)}
+ </script></body></html>

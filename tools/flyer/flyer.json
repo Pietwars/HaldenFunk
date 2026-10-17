@@ -1,0 +1,67 @@
+{
+ "name": "HaldenFunk",
+ "hero": "docs/images/haldenfunk-header.jpg",
+ "credit": "© Pietwars · Bild: HaldenFunk (eigene Grafik) · Kartendaten © OpenStreetMap (ODbL)",
+ "title_html": "Halden<span>Funk</span>",
+ "subtitle": "Glück Auf – Mesh fürs Mansfelder Land · @VERSION@",
+ "intro": "<b>Wenn Strom, Internet und Mobilfunk ausfallen, bleibt das Mansfelder Land in Kontakt.</b> HaldenFunk ist die regionale Variante von DisAHRsterRadio (Basis: disaster-radio) für Sangerhausen, Eisleben, Hettstedt, Mansfeld, Allstedt, Kelbra, Roßla und den Harzrand. LoRa-Funkboards auf Halden, Dächern und Fördertürmen reichen Nachrichten weiter – Bedienung per WLAN im Browser.",
+ "features": [
+  "Chat über das LoRa-Mesh (868 MHz)",
+  "Schnellmeldung: Hilfe/OK mit einem Tipp",
+  "Schwarzes Brett für Aushänge",
+  "Offline-Karten Mansfelder Land",
+  "Boards: T3-S3, T3 V1.6.1, Heltec V2",
+  "Open Source (GPLv3/AGPLv3)"
+ ],
+ "steps": [
+  "Firmware aus dem Release auf das LoRa-Board flashen, Antenne und Strom anschließen.",
+  "Handy mit dem WLAN <b>HaldenFunk-XXXXXX</b> verbinden (Passwort: USB-Seriell / OLED).",
+  "Im Browser <b>192.168.4.1</b> öffnen – chatten, melden, Karte nutzen."
+ ],
+ "repo": "https://github.com/Pietwars/HaldenFunk",
+ "extra_urls": [
+  [
+   "Download",
+   "https://github.com/Pietwars/HaldenFunk/releases"
+  ],
+  [
+   "Live-Demo",
+   "https://pietwars.github.io/HaldenFunk/"
+  ]
+ ],
+ "links": [
+  [
+   "Repository",
+   "https://github.com/Pietwars/HaldenFunk"
+  ],
+  [
+   "Release v@VERSION@",
+   "@RELEASE@"
+  ],
+  [
+   "Live-Demo",
+   "https://pietwars.github.io/HaldenFunk/"
+  ],
+  [
+   "DisAHRsterRadio",
+   "https://github.com/Pietwars/DisAHRsterRadio"
+  ]
+ ],
+ "qr_url": "https://github.com/Pietwars/HaldenFunk/releases",
+ "qr_label": "Download",
+ "demo": "https://pietwars.github.io/HaldenFunk/",
+ "theme": {
+  "#07130f": "#121012",
+  "#1d3a2a": "#322826",
+  "#10261b": "#1e1a1b",
+  "#10261c": "#1e1a1b",
+  "#2a4d36": "#5a4034",
+  "#2f5a3c": "#5a4034",
+  "#b9f48d": "#e8955a",
+  "#e8f0e4": "#f6eee6",
+  "#f3f8ee": "#f6eee6",
+  "#cfe3d2": "#e3d6cc",
+  "#9fb8a5": "#b8a79c"
+ },
+ "extra_css": "h1{color:#e8955a}h1 span{color:#f6eee6}.hero .bg{display:none}.hero img{width:100%;height:100%;object-fit:cover;object-position:center 62%}"
+}

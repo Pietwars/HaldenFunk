@@ -2,6 +2,7 @@
 
 ## Unveröffentlicht · 17.10.2026
 
+- Flyer-Generator `tools/flyer/flyer.py` (HTML + headless Chrome, QR-Codes mit python-qrcode; Konfiguration `tools/flyer/flyer.json` mit HaldenFunk-Farbschema, Version aus `VERSION`). Flyer 0.1.1-alpha damit neu erzeugt (Druck-PDF mit QR zu Download und Demo, Digital-PDF mit klickbaren Links).
 - **Zentrale Version:** Datei `VERSION` ist die einzige Quelle; `tools/version.py` schreibt `DAR_VERSION`, die neue Fußzeile „Weboberfläche HaldenFunk …“ im Gerät-Reiter, Demo-Gerätedaten und README; `--check` + `tests/version.test.py` in CI. `package.sh` und Demo-Banner lesen `VERSION`.
 - Projektfamilie: gemeinsame Tabelle mit allen fünf Repositorys.
 - **Automatische Releases:** Workflow `release.yml` baut bei jedem Tag `v*` alle drei Boards, packt `…-factory.bin`, `teile/`, `SHA256SUMS` und deutsche `ANLEITUNG.md`, prüft alles (`tools/verify_release.py`, Abbruch bei fehlender Datei) und veröffentlicht eine Vorabversion mit Text aus diesem CHANGELOG. Probelauf im Pull Request. Paketnamen jetzt mit Version: `HaldenFunk-<Version>-<Board>.zip`.

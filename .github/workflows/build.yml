@@ -28,7 +28,7 @@ jobs:
         with:
           path: ~/.platformio
           key: pio-${{ matrix.env }}-${{ hashFiles('firmware/platformio.ini') }}
-      - run: pip install -U platformio
+      - run: pip install platformio==6.2.0
       # Firmware-Build und buildfs leeren jeweils das Build-Verzeichnis -> Ergebnisse nach jedem Schritt sichern
       - name: Firmware bauen
         working-directory: firmware

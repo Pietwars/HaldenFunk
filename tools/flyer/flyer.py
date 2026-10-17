@@ -47,6 +47,10 @@ h2{font-size:10.5pt;margin:0 0 1.6mm;color:#b9f48d;text-transform:uppercase;lett
 .links{font-size:7.6pt;color:#cfe3d2;margin-top:1.2mm}.links a{color:#b9f48d;font-weight:700}
 .warn{border-left:1mm solid #e07a3d;background:#2a1a12;border-radius:2mm;padding:2.2mm 3mm;font-size:8.2pt;line-height:1.4}
 .warn b{color:#ffb38a}
+.top{display:grid;grid-template-columns:1fr 25mm;gap:4mm;align-items:start}.top>div{display:flex;flex-direction:column;gap:2.4mm}
+.phone{background:#0b0f0d;border:0.9mm solid #3a5a45;border-radius:4.5mm;padding:1.2mm;box-shadow:0 0 0 0.3mm #1c3526}
+.phone img{display:block;width:100%;height:46mm;object-fit:cover;object-position:top;border-radius:3mm}
+.top .feat{gap:.6mm 3mm;font-size:8pt}.top p{font-size:8.4pt}.phone small{display:block;text-align:center;font-size:6.2pt;color:#9fb8a5;margin-top:.8mm}
 footer{margin-top:auto;display:flex;justify-content:space-between;font-size:7pt;color:#9fb8a5}"""
 
 def chrome():
@@ -76,12 +80,16 @@ def page(f, digital):
         f'<div class="url2"><b>{k}:</b> {a(u, short(u))}</div>' for k, u in f['extra_urls'])
     if digital:
         urls += '<div class="links">Links: ' + ' · '.join(f'<a href="{u}">{k}</a>' for k, u in f['links']) + '</div>'
+    top = f'<div><h1>{f["title_html"]}</h1><p class="sub">{f["subtitle"]}</p></div><p>{f["intro"]}</p><div><h2>Funktionen</h2><ul class="feat">{feats}</ul></div>'
+    if f.get('gui'):
+        cap = f.get('gui_caption', 'Weboberfläche')
+        img = '<img src="gui.jpg" alt="' + html.escape(cap) + '">'
+        top = f'<div class="top"><div>{top}</div><div class="phone">{a(f["demo"], img)}<small>{cap}</small></div></div>'
     q1 = f'<img src="qr-projekt.png" alt="QR {html.escape(f["qr_label"])}">'
     q2 = '<img src="qr-demo.png" alt="QR Demo">'
     return f"""<!doctype html><html lang="de"><meta charset="utf-8"><title>{f['name']} · Flyer</title><style>{css(f)}</style><div class="page">
 <div class="hero"><div class="bg" style="--h:url(hero.jpg)"></div><img src="hero.jpg" alt="{f['name']}"></div>
-<div><h1>{f['title_html']}</h1><p class="sub">{f['subtitle']}</p></div><p>{f['intro']}</p>
-<div><h2>Funktionen</h2><ul class="feat">{feats}</ul></div>
+{top}
 <div><h2>So startest du</h2><div class="steps">{steps}</div></div>
 <div class="join"><div><h2>Projekt &amp; Download</h2><p style="font-size:8.6pt">Code, Anleitung, Fehler melden und mitmachen:</p>{urls}</div><div class="qr">{a(f['qr_url'], q1)}<small>{f['qr_label']}</small></div><div class="qr">{a(f['demo'], q2)}<small>Demo</small></div></div>
 <div class="warn"><b>Prototyp, kein zertifiziertes Notrufsystem.</b> Gemeinschaftsprojekt im Aufbau, ohne Gewähr. <b>Im Notfall immer 112.</b></div>
@@ -97,6 +105,7 @@ def main():
     out = Path(o.out); out.mkdir(parents=True, exist_ok=True)
     tmp = Path(tempfile.mkdtemp(prefix='flyer-'))
     shutil.copy(ROOT / f['hero'], tmp / 'hero.jpg')
+    if f.get('gui'): shutil.copy(ROOT / f['gui'], tmp / 'gui.jpg')
     qr(f['qr_url'], tmp / 'qr-projekt.png', qrcode.constants.ERROR_CORRECT_H)
     qr(f['demo'], tmp / 'qr-demo.png', qrcode.constants.ERROR_CORRECT_M)
     exe = chrome()
@@ -110,7 +119,7 @@ def main():
     for p in (out / f'{f["name"]}-Flyer-qr.png', out / f'{f["name"]}-Flyer-demo-qr.png'):
         shutil.copy(tmp / ('qr-projekt.png' if 'demo' not in p.name else 'qr-demo.png'), p)
     if f.get('keep_html'):  # Druck-HTML im Repo behalten (Bildpfade relativ zu docs/flyer)
-        h = page(f, False).replace('hero.jpg', Path(f['hero']).name).replace('qr-projekt.png', f'{f["name"]}-Flyer-qr.png').replace('qr-demo.png', f'{f["name"]}-Flyer-demo-qr.png')
+        h = page(f, False).replace('hero.jpg', Path(f['hero']).name).replace('gui.jpg', '../images/' + Path(f.get('gui', 'gui.jpg')).name).replace('qr-projekt.png', f'{f["name"]}-Flyer-qr.png').replace('qr-demo.png', f'{f["name"]}-Flyer-demo-qr.png')
         dst = ROOT / f['keep_html']; dst.write_text(h, encoding='utf-8')
         if not (dst.parent / Path(f['hero']).name).exists(): shutil.copy(ROOT / f['hero'], dst.parent / Path(f['hero']).name)
         print('geschrieben:', dst)

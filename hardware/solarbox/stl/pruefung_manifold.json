@@ -1,0 +1,119 @@
+{
+ "dichtung_tpu.stl": {
+  "watertight": true,
+  "winding": true,
+  "volume_ok": true,
+  "bodies": 1,
+  "faces": 704,
+  "extents": [
+   131.2,
+   103.2,
+   1.9
+  ],
+  "vol_cm3": 1.4
+ },
+ "gehaeuse_deckel.stl": {
+  "watertight": true,
+  "winding": true,
+  "volume_ok": true,
+  "bodies": 1,
+  "faces": 5852,
+  "extents": [
+   150.0,
+   122.0,
+   7.0
+  ],
+  "vol_cm3": 74.8
+ },
+ "gehaeuse_deckel_disahrsterradio.stl": {
+  "watertight": true,
+  "winding": true,
+  "volume_ok": true,
+  "bodies": 1,
+  "faces": 32994,
+  "extents": [
+   150.0,
+   122.0,
+   7.0
+  ],
+  "vol_cm3": 74.0
+ },
+ "gehaeuse_deckel_haldenfunk.stl": {
+  "watertight": true,
+  "winding": true,
+  "volume_ok": true,
+  "bodies": 1,
+  "faces": 30162,
+  "extents": [
+   150.0,
+   122.0,
+   7.0
+  ],
+  "vol_cm3": 73.9
+ },
+ "gehaeuse_unterteil.stl": {
+  "watertight": true,
+  "winding": true,
+  "volume_ok": true,
+  "bodies": 1,
+  "faces": 12460,
+  "extents": [
+   146.0,
+   134.0,
+   49.0
+  ],
+  "vol_cm3": 169.3
+ },
+ "platinenschlitten.stl": {
+  "watertight": true,
+  "winding": true,
+  "volume_ok": true,
+  "bodies": 1,
+  "faces": 1510,
+  "extents": [
+   40.0,
+   91.0,
+   11.1
+  ],
+  "vol_cm3": 12.8
+ },
+ "solar_halter_arm.stl": {
+  "watertight": true,
+  "winding": true,
+  "volume_ok": true,
+  "bodies": 1,
+  "faces": 2624,
+  "extents": [
+   130.0,
+   36.0,
+   36.0
+  ],
+  "vol_cm3": 30.3
+ },
+ "solar_halter_wand.stl": {
+  "watertight": true,
+  "winding": true,
+  "volume_ok": true,
+  "bodies": 1,
+  "faces": 5948,
+  "extents": [
+   70.0,
+   60.0,
+   67.0
+  ],
+  "vol_cm3": 52.8
+ },
+ "usb_stopfen_tpu.stl": {
+  "watertight": true,
+  "winding": true,
+  "volume_ok": true,
+  "bodies": 1,
+  "faces": 2396,
+  "extents": [
+   73.0,
+   18.0,
+   6.5
+  ],
+  "vol_cm3": 1.2
+ }
+}

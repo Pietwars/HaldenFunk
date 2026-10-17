@@ -1,4 +1,4 @@
-> Neuer Entwicklungsstand: WLAN ohne Passwort; BLE-UART ohne PIN in den zusätzlichen Testprofilen. Alte Kopplungen bei Bedarf am Handy entfernen. Betreiberzugang bleibt getrennt geschützt. Details: https://github.com/Pietwars/HaldenFunk/blob/main/docs/OFFENER_ZUGANG.md
+> Offenes WLAN; BLE-UART ohne PIN in den zusätzlichen Testprofilen. Alte Kopplungen bei Bedarf am Handy entfernen. Details: https://github.com/Pietwars/HaldenFunk/blob/main/docs/OFFENER_ZUGANG.md
 
 # HaldenFunk für @BOARD@
 
@@ -21,9 +21,9 @@ Version @VERSION@ (Commit @COMMIT@) · Quelle: https://github.com/Pietwars/Halde
 
 Die factory-Datei enthält Bootloader (@BOOT@), Partitionstabelle (0x8000), boot_app0 (0xe000), Firmware (0x10000) und Weboberfläche/Karten als LittleFS (0x200000).
 
-## 3. Ohne Passwort verbinden
+## 3. Verbinden
 
-Am Handy das WLAN `HaldenFunk-XXXXXX` auswählen und ohne Passwort verbinden. Bei „Kein Internet“ verbunden bleiben, dann `http://192.168.4.1` öffnen. Telnet ist deaktiviert; Konfiguration erfolgt über USB. BLE-UART ohne PIN ist in den zusätzlichen `*-ble`-Testprofilen verfügbar; deren abweichende Partitionierung beachten.
+Am Handy das WLAN `HaldenFunk-XXXXXX` auswählen und verbinden (höchstens 4 Handys). Bei „Kein Internet“ verbunden bleiben, dann `http://192.168.4.1` oder `http://haldenfunk.local` öffnen. Achtung: offenes, unverschlüsseltes WLAN – jede Person in Reichweite kann mitlesen und senden. Telnet ist entfernt; Konfiguration erfolgt über USB. BLE-UART ohne PIN ist in den zusätzlichen `*-ble`-Testprofilen verfügbar; deren abweichende Partitionierung beachten.
 
 ## 4. Update (nur Firmware)
 

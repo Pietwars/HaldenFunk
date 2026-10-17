@@ -215,7 +215,11 @@ void BleUartClient::init()
   BLEDevice::init(apName);
   // Default GATT permissions are open: no pairing PIN or configuration service.
   BLEDevice::setMTU(260);
+#if defined(CONFIG_IDF_TARGET_ESP32)
   BLEDevice::setPower(ESP_PWR_LVL_P7);
+#else
+  BLEDevice::setPower(ESP_PWR_LVL_P6); // ESP32-S3 kennt keine +7-dBm-Stufe
+#endif
 
 #ifdef DEBUG_OUT
   BLEAddress thisAddress = BLEDevice::getAddress();

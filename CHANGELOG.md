@@ -2,12 +2,11 @@
 
 ## Unveröffentlicht – offener Zugang
 
-- Offenes WLAN ohne Passwort, auch bei bestehenden Installationen.
-- MeshCore-Companion: PIN-freies BLE, öffentliche Befehle von Betreiberbefehlen getrennt.
-- Verkürzte Companion-Steuerbefehle und Pfadlängen vor Zugriff prüfen.
-- LoRaLayer2: Telnet-Konsole entfernt, kombinierte BLE-UART-Testprofile ergänzt.
-- Zugangsanleitung und Tests ergänzt; Hardwareabnahme steht aus.
-
+- **Offenes WLAN:** `HaldenFunk-XXXXXX` ohne Zugangsdaten (höchstens 4 Handys), ein früher gespeicherter AP-Schlüssel wird beim Start aus dem NVS gelöscht; seriell/OLED zeigen „offen“. WLAN bleibt auch bei früher gespeicherter BLE-only-Einstellung aktiv.
+- Telnet-Konsole entfernt, Betreiberkonfiguration nur über USB.
+- Zusätzliche Testprofile `*-ble`: WLAN plus BLE-UART ohne PIN (Partitionierung `huge_app.csv`; nicht MeshCore-App-kompatibel).
+- Kern auf DisAHRsterRadio `main` (offenes WLAN, #12/#13) per `tools/core_sync.py` aktualisiert; Overlay deutlich kleiner (Funkprofile jetzt im Kern).
+- Doku, Flash-Anleitung und Flyer ohne Zugangsdaten-Hinweise. Hardwareabnahme steht aus.
 
 ## Unveröffentlicht · 17.10.2026
 
@@ -43,4 +42,3 @@ Erste Version der Regionalvariante von [DisAHRsterRadio](https://github.com/Piet
 - Firmware-Pakete für LILYGO T3-S3 (SX1262), LILYGO/TTGO T3 V1.6.1 (SX1276) und Heltec WiFi LoRa 32 V2 (SX1276)
 
 Funktechnische Basis unverändert gegenüber DisAHRsterRadio 0.1.1-dev (disaster-radio/LoRaLayer2, RadioLib 7, pioarduino, LittleFS). Nicht auf echter Hardware getestet.
-

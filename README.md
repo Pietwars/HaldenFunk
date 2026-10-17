@@ -1,6 +1,6 @@
 # HaldenFunk
 
-> **Neuer Entwicklungsstand: WLAN ohne Passwort.** Zusätzliche WLAN-plus-BLE-UART-Testprofile verbinden ohne PIN; Standardprofile bleiben WLAN-only. [Zugang, Update und Abnahme](docs/OFFENER_ZUGANG.md). Frühere Releases/Flyer können noch Passwortzugänge beschreiben.
+> **Aktueller Stand:** offenes WLAN `HaldenFunk-XXXXXX` → `http://192.168.4.1` bzw. `http://haldenfunk.local` – einfach verbinden, nichts eingeben. Zusätzliche `*-ble`-Testprofile bieten BLE-UART ohne PIN. [Zugang, Update und Abnahme](docs/OFFENER_ZUGANG.md).
 
 
 **Glück Auf – Mesh fürs Mansfelder Land**
@@ -111,7 +111,7 @@ pio run -e t3s3-sx1262 -t uploadfs    # Weboberfläche (LittleFS)
 pio device monitor                     # zeigt WLAN-Name und offenen Zugang
 ```
 
-Dann mit dem offenen WLAN `HaldenFunk-XXXXXX` ohne Passwort verbinden und `http://192.168.4.1` öffnen. Betreiberkonsole nur über USB; Telnet ist deaktiviert.
+Dann mit dem offenen WLAN `HaldenFunk-XXXXXX` verbinden und `http://192.168.4.1` öffnen. Betreiberkonsole nur über USB; Telnet ist deaktiviert.
 
 Standard-Funkprofil (aktueller Stand `main`): **EU Narrow** – 869,618 MHz, 62,5 kHz, SF8, CR 4/8, 14 dBm; weitere Profile siehe [Funkprofile](#funkprofile-868-mhz-deutschland). Release-Firmware 0.1.1-alpha: 869,525 MHz, 125 kHz, SF9, CR 4/5.
 

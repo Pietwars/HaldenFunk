@@ -1,3 +1,12 @@
+diff --git a/.github/workflows/build.yml b/.github/workflows/build.yml
+index b1d46a1..6664bdd 100644
+--- a/.github/workflows/build.yml
++++ b/.github/workflows/build.yml
+@@ -50,3 +50,4 @@ jobs:
+           name: firmware-${{ matrix.env }}
+           if-no-files-found: error
+           path: artefakt/*.bin
++
 diff --git a/.github/workflows/release.yml b/.github/workflows/release.yml
 index 2b5ae75..d9ea22f 100644
 --- a/.github/workflows/release.yml
@@ -25,294 +34,11 @@ index 2b5ae75..d9ea22f 100644
 +            gh release create "$TAG" --prerelease --verify-tag --title "HaldenFunk $TAG (Vorabversion)" --notes-file notes.md $ASSETS
            fi
            gh release view "$TAG" --json assets --jq '.assets[].name'
-diff --git a/firmware/config.h b/firmware/config.h
-index 10c2b57..68c802a 100644
---- a/firmware/config.h
-+++ b/firmware/config.h
-@@ -13,8 +13,9 @@
- #define HEAP_WARN_BYTES 40960
- #endif
- 
--// EU868 Standard: 869.525 MHz (Teilband g3, 10 % Duty-Cycle), 125 kHz, SF9, 14 dBm
--#define LORA_DEFAULT_FREQ_MHZ 869.525f
-+// Funkparameter: Funkprofile in lib/LoRaLayer2/src/RadioPresets.h
-+// Standard "EU Narrow": 869.618 MHz, 62.5 kHz, SF8, CR 4/8 (Teilband 869,4-869,65 MHz, 10 %, max. 500 mW ERP)
-+#define LORA_DEFAULT_FREQ_MHZ 869.618f
- 
- #ifndef STARTUP_STAGGER_MS
- #define STARTUP_STAGGER_MS 150
-diff --git a/firmware/lib/LoRaLayer2/src/Layer1_RadioLib.cpp b/firmware/lib/LoRaLayer2/src/Layer1_RadioLib.cpp
-index a57d062..19f4102 100644
---- a/firmware/lib/LoRaLayer2/src/Layer1_RadioLib.cpp
-+++ b/firmware/lib/LoRaLayer2/src/Layer1_RadioLib.cpp
-@@ -5,11 +5,14 @@ static volatile bool _transmitFlag = false;
- uint32_t Layer1Class::_holdUntil = 0;
- 
- Layer1Class::Layer1Class(L1Radio *lora, int mode, int cs, int reset, int dio, uint8_t sf,
--                         float frequency, int power, float bandwidth, float tcxo)
-+                         float frequency, int power, float bandwidth, float tcxo, uint8_t cr, float dutyLimit)
- : _LoRa(lora), _mode(mode), _csPin(cs), _resetPin(reset), _DIOPin(dio), _spreadingFactor(sf),
-   _loraFrequency(frequency), _txPower(power), _loraInitialized(0), _spiFrequency(2000000),
--  _bandwidth(bandwidth), _tcxo(tcxo)
-+  _bandwidth(bandwidth), _tcxo(tcxo), _codingRate(cr), _dutyLimit(dutyLimit),
-+  _slotStart(0), _slotIdx(0), _lastAirtimeMs(0), _deferred(0), _blocked(false), _hasPending(false)
- {
-+    if (_txPower > L1_MAX_DBM) _txPower = L1_MAX_DBM; // nie ueber Chipgrenze
-+    memset(_slots, 0, sizeof(_slots));
-     txBuffer = new packetBuffer();
-     rxBuffer = new packetBuffer();
- }
-@@ -21,25 +24,38 @@ void Layer1Class::setFlag(void) { _dioFlag = true; }
- 
- int Layer1Class::init() {
- #if defined(RL_SX1262)
--    int state = _LoRa->begin(_loraFrequency, _bandwidth, _spreadingFactor, 5,
-+    int state = _LoRa->begin(_loraFrequency, _bandwidth, _spreadingFactor, _codingRate,
-                              RADIOLIB_SX126X_SYNC_WORD_PRIVATE, _txPower, 8, _tcxo, false);
-     if (state == RADIOLIB_ERR_NONE) {
-         _LoRa->setDio2AsRfSwitch(true);
--        _LoRa->setCurrentLimit(140);
-+        _LoRa->setCurrentLimit(140);          // PA-Strombegrenzung (mA)
-+        _LoRa->setRxBoostedGainMode(true);    // bessere Empfindlichkeit (+~2 dB, etwas mehr Strom)
-+        _LoRa->setCRC(2);
-+        _LoRa->explicitHeader();
-+        _LoRa->autoLDRO();                    // Low-Data-Rate-Optimierung automatisch (SF11/12 @ BW125)
-     }
- #else
--    int state = _LoRa->begin(_loraFrequency, _bandwidth, _spreadingFactor, 5,
-+    int state = _LoRa->begin(_loraFrequency, _bandwidth, _spreadingFactor, _codingRate,
-                              RADIOLIB_SX127X_SYNC_WORD, _txPower, 8, 0);
-+    if (state == RADIOLIB_ERR_NONE) {
-+        _LoRa->setCurrentLimit(120);          // OCP (mA), PA_BOOST bis 20 dBm
-+        _LoRa->setCRC(true);
-+        _LoRa->explicitHeader();
-+        _LoRa->autoLDRO();
-+    }
- #endif
--    Serial.printf("Layer1::init(): RadioLib state = %d\r\n", state);
-+    Serial.printf("Layer1::init(): RadioLib state = %d (%.3f MHz, BW %.1f, SF%d, CR4/%d, %d dBm)\r\n",
-+                  state, _loraFrequency, _bandwidth, _spreadingFactor, _codingRate, _txPower);
-     if (state != RADIOLIB_ERR_NONE) return 0;
-     _LoRa->setPacketReceivedAction(Layer1Class::setFlag);
-     if (_LoRa->startReceive() != RADIOLIB_ERR_NONE) return 0;
-+    _slotStart = millis();
-     _loraInitialized = 1;
-     return 1;
- }
- 
- void Layer1Class::setTxPower(int p) {
-+    if (p > L1_MAX_DBM) p = L1_MAX_DBM;
-     if (_LoRa->setOutputPower(p) == RADIOLIB_ERR_NONE) _txPower = p;
- }
- 
-@@ -48,6 +64,26 @@ void Layer1Class::setSpreadingFactor(uint8_t sf) {
-     _LoRa->startReceive();
- }
- 
-+uint32_t Layer1Class::timeOnAirMs(size_t len) {
-+    return (uint32_t)((_LoRa->getTimeOnAir(len) + 999) / 1000); // RadioLib liefert Mikrosekunden
-+}
-+
-+void Layer1Class::rollSlots() {
-+    uint32_t now = millis();
-+    while (now - _slotStart >= L1_AIRTIME_SLOT_MS) {
-+        _slotStart += L1_AIRTIME_SLOT_MS;
-+        _slotIdx = (_slotIdx + 1) % L1_AIRTIME_SLOTS;
-+        _slots[_slotIdx] = 0;
-+    }
-+}
-+
-+uint32_t Layer1Class::airtimeUsedMs() {
-+    rollSlots();
-+    uint32_t s = 0;
-+    for (int i = 0; i < L1_AIRTIME_SLOTS; i++) s += _slots[i];
-+    return s;
-+}
-+
- int Layer1Class::sendPacket(char *data, size_t len) {
-     _transmitFlag = true;
-     int state = _LoRa->startTransmit((uint8_t *)data, len);
-@@ -62,9 +98,24 @@ int Layer1Class::sendPacket(char *data, size_t len) {
- int Layer1Class::transmit() {
-     if (_transmitFlag) return 0; // laufende Aussendung abwarten
-     if ((int32_t)(millis() - _holdUntil) < 0) return 0; // Sendepause (WLAN-Start)
--    BufferEntry entry = txBuffer->read();
--    if (entry.length > 0) sendPacket(entry.data, entry.length);
--    return entry.length;
-+    if (!_hasPending) {
-+        _pending = txBuffer->read();
-+        if (_pending.length <= 0) return 0;
-+        _hasPending = true;
-+    }
-+    uint32_t toa = timeOnAirMs(_pending.length);
-+    // Sendezeitgrenze des Teilbands (gleitende Stunde): Paket zurueckhalten statt senden
-+    if (airtimeUsedMs() + toa > airtimeBudgetMs()) {
-+        if (!_blocked) { _deferred++; Serial.printf("[DUTY] Sendezeitgrenze erreicht, Paket wartet\r\n"); }
-+        _blocked = true;
-+        return 0;
-+    }
-+    _blocked = false;
-+    _hasPending = false;
-+    if (sendPacket(_pending.data, _pending.length) != 0) return 0;
-+    _slots[_slotIdx] += toa;
-+    _lastAirtimeMs = toa;
-+    return _pending.length;
- }
- 
- int Layer1Class::receive() {
-diff --git a/firmware/lib/LoRaLayer2/src/Layer1_RadioLib.h b/firmware/lib/LoRaLayer2/src/Layer1_RadioLib.h
-index 9f1979d..dbf072e 100644
---- a/firmware/lib/LoRaLayer2/src/Layer1_RadioLib.h
-+++ b/firmware/lib/LoRaLayer2/src/Layer1_RadioLib.h
-@@ -1,24 +1,32 @@
- // DisAHRsterRadio: vereinheitlichte RadioLib-Layer1 (ersetzt Layer1_LoRa/Layer1_SX1276/Layer1_SX126x
- // aus sudomesh/LoRaLayer2). Unterstuetzt SX1276 (RL_SX1276) und SX1262 (RL_SX1262), RadioLib >= 7.
-+// Funkprofile siehe RadioPresets.h; Sendezeit-Buchfuehrung (gleitende Stunde) mit getTimeOnAir().
- #ifndef LAYER1_RADIOLIB_H
- #define LAYER1_RADIOLIB_H
- #include <Arduino.h>
- #include <RadioLib.h>
- #include <SPI.h>
- #include <packetBuffer.h>
-+#include <RadioPresets.h>
- 
- #if defined(RL_SX1262)
- typedef SX1262 L1Radio;
-+#define L1_MAX_DBM 22
- #elif defined(RL_SX1276)
- typedef SX1276 L1Radio;
-+#define L1_MAX_DBM 20
- #else
- #error "RL_SX1262 oder RL_SX1276 definieren"
- #endif
- 
-+#define L1_AIRTIME_SLOTS 60          // 60 x 1 min = gleitende Stunde
-+#define L1_AIRTIME_SLOT_MS 60000UL
-+
- class Layer1Class {
- public:
--    Layer1Class(L1Radio *lora, int mode, int cs, int reset, int dio, uint8_t sf = 9,
--                float frequency = 869.525, int power = 14, float bandwidth = 125.0, float tcxo = 0.0);
-+    Layer1Class(L1Radio *lora, int mode, int cs, int reset, int dio, uint8_t sf = 8,
-+                float frequency = 869.618, int power = 14, float bandwidth = 62.5, float tcxo = 0.0,
-+                uint8_t cr = 8, float dutyLimit = 0.10f);
-     static int getTime() { return millis(); }
-     int spreadingFactor() { return _spreadingFactor; }
-     int loraInitialized() { return _loraInitialized; }
-@@ -27,12 +35,22 @@ public:
-     int DIOPin() { return _DIOPin; }
-     long spiFrequency() { return _spiFrequency; }
-     float loraFrequency() { return _loraFrequency; }
-+    float bandwidth() { return _bandwidth; }
-+    int codingRate() { return _codingRate; }
-     int txPower() { return _txPower; }
-     void setTxPower(int p);
-     // LoRa-Senden fuer ms Millisekunden zurueckhalten (z. B. waehrend WLAN-Start)
-     static void holdTx(uint32_t ms) { _holdUntil = millis() + ms; }
-     static uint32_t _holdUntil;
-     void setSpreadingFactor(uint8_t sf);
-+    // Sendezeit (ms) eines Pakets dieser Laenge mit den aktuellen Funkparametern
-+    uint32_t timeOnAirMs(size_t len);
-+    uint32_t lastAirtimeMs() { return _lastAirtimeMs; }
-+    uint32_t airtimeUsedMs();                       // Summe der letzten Stunde
-+    uint32_t airtimeBudgetMs() { return (uint32_t)(_dutyLimit * 3600000.0f); }
-+    float dutyLimit() { return _dutyLimit; }
-+    uint32_t deferredCount() { return _deferred; }  // wegen Sendezeitgrenze zurueckgehaltene Versuche
-+    bool txBlocked() { return _blocked; }
-     packetBuffer *txBuffer;
-     packetBuffer *rxBuffer;
-     int init();
-@@ -41,6 +59,7 @@ public:
- private:
-     static void setFlag(void);
-     int sendPacket(char *data, size_t len);
-+    void rollSlots();
-     L1Radio *_LoRa;
-     int _mode, _csPin, _resetPin, _DIOPin;
-     uint8_t _spreadingFactor;
-@@ -50,5 +69,15 @@ private:
-     long _spiFrequency;
-     float _bandwidth;
-     float _tcxo;
-+    uint8_t _codingRate;
-+    float _dutyLimit;
-+    uint32_t _slots[L1_AIRTIME_SLOTS];
-+    uint32_t _slotStart;
-+    int _slotIdx;
-+    uint32_t _lastAirtimeMs;
-+    uint32_t _deferred;
-+    bool _blocked;
-+    BufferEntry _pending;
-+    bool _hasPending;
- };
- #endif
-diff --git a/firmware/lib/LoRaLayer2/src/LoRaLayer2.cpp b/firmware/lib/LoRaLayer2/src/LoRaLayer2.cpp
-index a9f53fd..37fcfea 100644
---- a/firmware/lib/LoRaLayer2/src/LoRaLayer2.cpp
-+++ b/firmware/lib/LoRaLayer2/src/LoRaLayer2.cpp
-@@ -684,7 +684,8 @@ int LL2Class::daemon(){
-           Serial.printf("LL2::daemon(): transmitted packet of length: %d\r\n", length);
-           #endif
-           _lastTransmitTime = Layer1Class::getTime();
--          double airtime = calculateAirtime((double)length, (double)LoRa1->spreadingFactor(), 1, 0, 5, 125);
-+          // Sendezeit aus RadioLib (getTimeOnAir) mit den aktiven Funkparametern statt fester SF/BW125/CR5-Formel
-+          double airtime = (double)LoRa1->lastAirtimeMs();
-           _dutyInterval = (int)ceil(airtime/_dutyCycle);
-           _messageCount = (_messageCount + 1) % 256;
-         }
-diff --git a/firmware/lib/LoRaLayer2/src/RadioPresets.h b/firmware/lib/LoRaLayer2/src/RadioPresets.h
-new file mode 100644
-index 0000000..603e80f
---- /dev/null
-+++ b/firmware/lib/LoRaLayer2/src/RadioPresets.h
-@@ -0,0 +1,34 @@
-+// DisAHRsterRadio/HaldenFunk: Funkprofile fuer 868 MHz in Deutschland
-+// (ETSI EN 300 220 / BNetzA SRD-Allgemeinzuteilung, Teilband 869,4-869,65 MHz:
-+//  max. 500 mW ERP, 10 % Sendezeit). Alle Profile liegen vollstaendig in diesem Teilband:
-+//  62,5 kHz auf 869,618 MHz (869,587-869,649), 125/250 kHz auf 869,525 MHz (869,400-869,650).
-+// Alle Knoten eines Netzes muessen dasselbe Profil verwenden.
-+#ifndef RADIO_PRESETS_H
-+#define RADIO_PRESETS_H
-+#include <stdint.h>
-+
-+struct RadioPreset {
-+    const char *id;
-+    const char *name;
-+    float freqMHz;
-+    float bwKHz;
-+    uint8_t sf;
-+    uint8_t cr;          // Nenner der Coderate (5..8 => 4/5..4/8)
-+    float dutyLimit;     // erlaubter Sendezeitanteil im Teilband (0.10 = 10 %)
-+    uint8_t maxErpDbm;   // Grenze des Teilbands (27 dBm = 500 mW ERP)
-+};
-+
-+static const RadioPreset RADIO_PRESETS[] = {
-+    {"eu-narrow", "EU Narrow (Standard)",        869.618f,  62.5f,  8, 8, 0.10f, 27},
-+    {"nah",       "Nah/Schnell",                 869.525f, 250.0f,  7, 5, 0.10f, 27},
-+    {"mittel",    "Mittel (bisheriger Standard)", 869.525f, 125.0f,  9, 5, 0.10f, 27},
-+    {"fern",      "Fern",                        869.525f, 125.0f, 12, 8, 0.10f, 27},
-+    {"longfast",  "LongFast-aehnlich",           869.525f, 250.0f, 11, 5, 0.10f, 27},
-+};
-+static const int RADIO_PRESET_COUNT = sizeof(RADIO_PRESETS) / sizeof(RADIO_PRESETS[0]);
-+static const int RADIO_PRESET_DEFAULT = 0;
-+
-+static inline const RadioPreset &getRadioPreset(int i) {
-+    return RADIO_PRESETS[(i >= 0 && i < RADIO_PRESET_COUNT) ? i : RADIO_PRESET_DEFAULT];
-+}
-+#endif
 diff --git a/firmware/main.ino b/firmware/main.ino
-index d01d0d6..9be7fc5 100644
+index 1ea44cc..a9a6886 100644
 --- a/firmware/main.ino
 +++ b/firmware/main.ino
-@@ -24,6 +24,7 @@
- #include <Layer1_RadioLib.h>
- 
- #include <LoRaLayer2.h>
-+#include <RadioPresets.h>
- 
- // server
- #include "server/DisasterRadio.h"
-@@ -48,9 +49,9 @@
+@@ -49,9 +49,9 @@
  #include "DisasterHistory.h"
  #include "DisasterMiddleware.h"
  
@@ -325,67 +51,16 @@ index d01d0d6..9be7fc5 100644
  
  #define INDEX_FILE "index.html"
  
-@@ -91,8 +92,10 @@ LL2Class *LL2;
- 
- #include "settings/settings.h"
- 
--// 869 (Standard) => 869.525 MHz, sonst ganzzahliger Wert aus den Einstellungen
--float loraFreqMHz() { return loraFrq == 869 ? LORA_DEFAULT_FREQ_MHZ : (float)loraFrq; }
-+// Funkprofil aus den Einstellungen (RadioPresets.h); Frequenz/BW/SF/CR kommen nur noch von dort
-+const RadioPreset &activePreset() { return getRadioPreset(radioPreset); }
-+float loraFreqMHz() { return activePreset().freqMHz; }
-+Layer1Class *Layer1_main = NULL;
- 
- DisasterRadio *radio = new DisasterRadio();
- DisasterHistory *history = NULL;
-@@ -284,17 +287,42 @@ void setupHTTPSever()
-   }
- 
+@@ -276,7 +276,7 @@ void setupHTTPSever()
    http_server.on("/api/info", HTTP_GET, [](AsyncWebServerRequest *request) {
--    char json[512];
-+    char json[768];
+     char json[768];
      snprintf(json, sizeof(json),
 -             "{\"name\":\"DisAHRsterRadio\",\"version\":\"%s\",\"board\":\"%s\",\"node\":\"%s\",\"ssid\":\"%s\","
--             "\"lora\":%s,\"freq\":%.3f,\"sf\":%d,\"txPower\":%d,\"routes\":%d,\"clients\":%d,\"sd\":%s,\"uptime\":%lu,"
 +             "{\"name\":\"HaldenFunk\",\"version\":\"%s\",\"board\":\"%s\",\"node\":\"%s\",\"ssid\":\"%s\","
-+             "\"lora\":%s,\"preset\":%d,\"presetId\":\"%s\",\"presetName\":\"%s\",\"freq\":%.3f,\"bw\":%.1f,\"sf\":%d,\"cr\":\"4/%d\",\"airtimeMs\":%lu,\"airtimeBudgetMs\":%lu,\"airtimePct\":%.2f,\"dutyLimitPct\":%.0f,\"txDeferred\":%lu,\"txPower\":%d,\"routes\":%d,\"clients\":%d,\"sd\":%s,\"uptime\":%lu,"
+              "\"lora\":%s,\"preset\":%d,\"presetId\":\"%s\",\"presetName\":\"%s\",\"freq\":%.3f,\"bw\":%.1f,\"sf\":%d,\"cr\":\"4/%d\",\"airtimeMs\":%lu,\"airtimeBudgetMs\":%lu,\"airtimePct\":%.2f,\"dutyLimitPct\":%.0f,\"txDeferred\":%lu,\"txPower\":%d,\"routes\":%d,\"clients\":%d,\"sd\":%s,\"uptime\":%lu,"
               "\"heap\":%u,\"minHeap\":%u,\"maxBlock\":%u,\"heapWarn\":%u}",
--             DAR_VERSION, BOARD_NAME, nodeAddress, ssid, loraInitialized ? "true" : "false", loraFreqMHz(), spreadingFactor,
-+             DAR_VERSION, BOARD_NAME, nodeAddress, ssid, loraInitialized ? "true" : "false", radioPreset, activePreset().id, activePreset().name, loraFreqMHz(), activePreset().bwKHz, activePreset().sf, activePreset().cr,
-+             (unsigned long)(Layer1_main ? Layer1_main->airtimeUsedMs() : 0), (unsigned long)(activePreset().dutyLimit * 3600000.0f),
-+             Layer1_main ? Layer1_main->airtimeUsedMs() / 36000.0f : 0.0f, activePreset().dutyLimit * 100.0f, (unsigned long)(Layer1_main ? Layer1_main->deferredCount() : 0),
-              txPower, routes, clients, sdInitialized ? "true" : "false", (unsigned long)(millis() / 1000),
-              (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMinFreeHeap(), (unsigned)ESP.getMaxAllocHeap(), (unsigned)HEAP_WARN_BYTES);
-     request->send(200, "application/json", json);
-   });
- 
-+  // Funkprofile auflisten / waehlen (gespeichert im NVS, wirksam nach Neustart)
-+  http_server.on("/api/presets", HTTP_GET, [](AsyncWebServerRequest *request) {
-+    String j = "[";
-+    for (int i = 0; i < RADIO_PRESET_COUNT; i++) {
-+      const RadioPreset &p = RADIO_PRESETS[i];
-+      char b[200];
-+      snprintf(b, sizeof(b), "%s{\"i\":%d,\"id\":\"%s\",\"name\":\"%s\",\"freq\":%.3f,\"bw\":%.1f,\"sf\":%d,\"cr\":%d,\"duty\":%.0f}",
-+               i ? "," : "", i, p.id, p.name, p.freqMHz, p.bwKHz, p.sf, p.cr, p.dutyLimit * 100.0f);
-+      j += b;
-+    }
-+    request->send(200, "application/json", j + "]");
-+  });
-+  http_server.on("/api/preset", HTTP_POST, [](AsyncWebServerRequest *request) {
-+    if (!request->hasParam("preset", true)) { request->send(400, "text/plain", "preset fehlt"); return; }
-+    int p = request->getParam("preset", true)->value().toInt();
-+    if (p < 0 || p >= RADIO_PRESET_COUNT) { request->send(400, "text/plain", "ungueltiges Profil"); return; }
-+    saveRadioPreset(p);
-+    request->send(200, "application/json", "{\"ok\":true,\"restart\":true}");
-+    static esp_timer_handle_t t = NULL;
-+    if (!t) { esp_timer_create_args_t a = {}; a.callback = [](void *) { ESP.restart(); }; a.name = "rst"; esp_timer_create(&a, &t); }
-+    esp_timer_start_once(t, 1500000);
-+  });
-+
-   http_server.on("/api/board", HTTP_GET, [](AsyncWebServerRequest *request) {
-     request->send(200, "application/json", board ? board->toJson() : String("[]"));
-   });
-@@ -351,11 +379,11 @@ public:
+              DAR_VERSION, BOARD_NAME, nodeAddress, ssid, loraInitialized ? "true" : "false", radioPreset, activePreset().id, activePreset().name, loraFreqMHz(), activePreset().bwKHz, activePreset().sf, activePreset().cr,
+@@ -366,11 +366,11 @@ public:
      Serial.printf("WelcomeMessage username: >%s<\n", username.c_str());
      if (username.isEmpty())
      {
@@ -399,31 +74,7 @@ index d01d0d6..9be7fc5 100644
      }
  
      struct Datagram datagram1 = buildDatagram(BROADCAST, 'i', (uint8_t *)data, msgLen);
-@@ -429,11 +457,13 @@ void setupLoRa()
-   pinMode(LORA2_CS, OUTPUT);
-   digitalWrite(LORA2_CS, HIGH);
-   #endif
--  Layer1Class *Layer1_1 = new Layer1Class(&lora, 0, LORA_CS, LORA_RST, LORA_IRQ, spreadingFactor, loraFreqMHz(), txPower, 125.0, LORA_TCXO);
-+  const RadioPreset &rp = activePreset();
-+  Layer1Class *Layer1_1 = new Layer1Class(&lora, 0, LORA_CS, LORA_RST, LORA_IRQ, rp.sf, rp.freqMHz, txPower, rp.bwKHz, LORA_TCXO, rp.cr, rp.dutyLimit);
-+  Layer1_main = Layer1_1;
-   #ifdef DUAL_LORA
-   digitalWrite(LORA_CS, HIGH);
-   digitalWrite(LORA2_CS, LOW);
--  Layer1Class *Layer1_2 = new Layer1Class(&lora2, 0, LORA2_CS, LORA2_RST, LORA2_IRQ, 7, loraFreqMHz(), txPower, 125.0, LORA_TCXO);
-+  Layer1Class *Layer1_2 = new Layer1Class(&lora2, 0, LORA2_CS, LORA2_RST, LORA2_IRQ, rp.sf, rp.freqMHz, txPower, rp.bwKHz, LORA_TCXO, rp.cr, rp.dutyLimit);
-   digitalWrite(LORA_CS, LOW);
-   digitalWrite(LORA2_CS, HIGH);
-   #endif
-@@ -442,6 +472,7 @@ void setupLoRa()
-     #ifndef DUAL_LORA
-     Serial.printf(" --> Layer1 init succeeded\r\n");
-     LL2 = new LL2Class(Layer1_1);
-+    LL2->setDutyCycle(rp.dutyLimit);
-     #else
-     if(Layer1_2->init()){
-       Serial.printf(" --> Dual Layer1 init succeeded\r\n");
-@@ -619,7 +650,7 @@ void setup()
+@@ -628,7 +628,7 @@ void setup()
    setCpuFrequencyMhz(CLOCK_SPEED); //Set CPU clock in config.h
    getCpuFrequencyMhz(); //Get CPU clock
  
@@ -433,7 +84,7 @@ index d01d0d6..9be7fc5 100644
  #ifndef WIFI_LATE
    setupNetwork();
 diff --git a/firmware/platformio.ini b/firmware/platformio.ini
-index 82d4106..88f726d 100644
+index c946fba..3216e02 100644
 --- a/firmware/platformio.ini
 +++ b/firmware/platformio.ini
 @@ -1,4 +1,4 @@
@@ -442,132 +93,27 @@ index 82d4106..88f726d 100644
  ; Basis: sudomesh/disaster-radio, modernisiert (Arduino-ESP32 3.x via pioarduino, RadioLib 7, LittleFS)
  
  [platformio]
-diff --git a/firmware/src/middleware/Console.cpp b/firmware/src/middleware/Console.cpp
-index 0775651..3f0783f 100644
---- a/firmware/src/middleware/Console.cpp
-+++ b/firmware/src/middleware/Console.cpp
-@@ -8,6 +8,7 @@
- #include "../../config.h"
- #ifndef SIM
- #include "settings/settings.h"
-+#include <RadioPresets.h>
- #endif
- 
- #ifdef SIM
-@@ -65,7 +66,8 @@ void Console::txpowerUsage()
- 
- void Console::lorafrqUsage()
- {
--  printf("'lorafrq VAL'  - sets the frequency for the LoRa transceiver,\r\n");
-+  printf("'preset N'     - Funkprofil waehlen (0 EU Narrow, 1 Nah/Schnell, 2 Mittel, 3 Fern, 4 LongFast-aehnlich)\r\n");
-+  printf("'lorafrq VAL'  - (veraltet) wie 'preset',\r\n");
-   printf("                 where VAL is desired frequency in MHz\r\n\r\n");
- }
- 
-@@ -155,10 +157,15 @@ void Console::txpowerSet(std::vector<char *> args)
- 
- void Console::lorafrqSet(std::vector<char *> args)
- {
--  int value;
--
-+  // Frequenz/Bandbreite/SF/CR kommen jetzt aus dem Funkprofil
-+  int value = -1;
-   sscanf(&args[2][0], "%d", &value);
--  saveLoraFrq(value);
-+  if (value < 0 || value >= RADIO_PRESET_COUNT) {
-+    printf("Funkprofil 0..%d erwartet: '/set preset N' (0 = EU Narrow)\r\n", RADIO_PRESET_COUNT - 1);
-+    return;
-+  }
-+  saveRadioPreset(value);
-+  printf("Funkprofil %d (%s) gespeichert, Neustart ...\r\n", value, getRadioPreset(value).name);
-   delay(500);
-   ESP.restart();
- }
-@@ -170,12 +177,11 @@ void Console::sfSet(std::vector<char *> args)
-   int value;
- 
-   sscanf(&args[2][0], "%d", &value);
--  if((value < 6) || (value > 12)){
--    printf("Invalid value provided, type '/set sf VAL'\r\n");
--    sfUsage();
-+  if (true) {
-+    // Spreizfaktor ist Teil des Funkprofils (alle Knoten muessen gleich sein)
-+    printf("SF wird ueber das Funkprofil gesetzt: '/set preset N'\r\n");
-   }
-   else{
--    saveSpreadingFactor(value);
-     memcpy(response.destination, BROADCAST, ADDR_LENGTH);
-     response.type = 'i';
-     msgLen = sprintf((char *)response.message, "sf %d", value);
-@@ -258,6 +264,10 @@ void Console::set(std::vector<char *> args)
-     printf("No value provided, type '/set txpower VAL'\r\n");
-     txpowerUsage();
-   }
-+  else if ((strncmp(&args[1][0], "preset", 6) == 0) && (args.size() > 2))
-+  {
-+    lorafrqSet(args);
-+  }
-   else if ((strncmp(&args[1][0], "lorafrq", 7) == 0) && (args.size() > 2))
-   {
-     lorafrqSet(args);
-diff --git a/firmware/src/settings/settings.cpp b/firmware/src/settings/settings.cpp
-index 84692ee..7ed000b 100644
---- a/firmware/src/settings/settings.cpp
-+++ b/firmware/src/settings/settings.cpp
-@@ -10,6 +10,7 @@ int spreadingFactor = 9;
- double dutyCycle = .1;
- long routeInterval = 10000;
- long beaconPeriod = 0;
-+int radioPreset = 0; // 0 = EU Narrow (869,618 MHz, 62,5 kHz, SF8, CR 4/8)
- 
- void getSettings(void)
- {
-@@ -47,6 +48,8 @@ void getSettings(void)
-   routeInterval = preferences.getLong("interval", routeInterval);
-   Serial.printf("Got interval setting %ld\n", routeInterval);
-   beaconPeriod = preferences.getLong("gps", beaconPeriod);
-+  radioPreset = preferences.getInt("preset", radioPreset);
-+  Serial.printf("Got preset setting %d\n", radioPreset);
-   Serial.printf("Got gps setting %ld\n", beaconPeriod);
- 
-   preferences.end();
-@@ -156,3 +159,14 @@ void saveGPS(long period)
-   preferences.putLong("gps", period);
-   preferences.end();
- }
-+
-+void saveRadioPreset(int preset)
-+{
-+  if (!preferences.begin("dr", false))
-+  {
-+    Serial.println("Error opening preferences");
-+    return;
-+  }
-+  preferences.putInt("preset", preset);
-+  preferences.end();
-+}
-diff --git a/firmware/src/settings/settings.h b/firmware/src/settings/settings.h
-index 6cf72c9..e0501f4 100644
---- a/firmware/src/settings/settings.h
-+++ b/firmware/src/settings/settings.h
-@@ -11,6 +11,7 @@ void saveSpreadingFactor(int spreadFactor);
- void saveDutyCycle(double dutyCycle);
- void saveInterval(long interval);
- void saveGPS(long period);
-+void saveRadioPreset(int preset);
- 
- extern String username;
- extern bool useBLE;
-@@ -20,3 +21,4 @@ extern int spreadingFactor;
- extern double dutyCycle;
- extern long routeInterval;
- extern long beaconPeriod;
-+extern int radioPreset; // Index in RADIO_PRESETS (RadioPresets.h)
+diff --git a/firmware/src/client/BleUartClient.cpp b/firmware/src/client/BleUartClient.cpp
+index deb7b21..b511e9a 100644
+--- a/firmware/src/client/BleUartClient.cpp
++++ b/firmware/src/client/BleUartClient.cpp
+@@ -203,7 +203,7 @@ void BleUartClient::init()
+   if(!rxQueue || !txQueue) { Serial.println("[BLE] Kein RAM fuer BLE-UART; WLAN bleibt aktiv"); return; }
+   uint64_t uniqueId = ESP.getEfuseMac();
+   // Using ESP32 MAC (48 bytes only, so upper 2 bytes will be 0)
+-  snprintf(apName, sizeof(apName), "DisAHRsterRadio-%02X%02X%02X%02X%02X%02X",
++  snprintf(apName, sizeof(apName), "HaldenFunk-%02X%02X%02X%02X%02X%02X",
+           (uint8_t)(uniqueId), (uint8_t)(uniqueId >> 8),
+           (uint8_t)(uniqueId >> 16), (uint8_t)(uniqueId >> 24),
+           (uint8_t)(uniqueId >> 32), (uint8_t)(uniqueId >> 40));
 diff --git a/tools/ANLEITUNG.template.md b/tools/ANLEITUNG.template.md
-index 767cc2a..e2d3d3c 100644
+index 40b12d3..2ab2a52 100644
 --- a/tools/ANLEITUNG.template.md
 +++ b/tools/ANLEITUNG.template.md
-@@ -1,8 +1,8 @@
+@@ -1,10 +1,10 @@
+-> Offenes WLAN; BLE-UART ohne PIN in den zusätzlichen Testprofilen. Alte Kopplungen bei Bedarf am Handy entfernen. Details: https://github.com/Pietwars/DisAHRsterRadio/blob/main/docs/OFFENER_ZUGANG.md
++> Offenes WLAN; BLE-UART ohne PIN in den zusätzlichen Testprofilen. Alte Kopplungen bei Bedarf am Handy entfernen. Details: https://github.com/Pietwars/HaldenFunk/blob/main/docs/OFFENER_ZUGANG.md
+ 
 -# DisAHRsterRadio für @BOARD@
 +# HaldenFunk für @BOARD@
  
@@ -579,25 +125,25 @@ index 767cc2a..e2d3d3c 100644
  
  ## 1. Zuerst die Antenne!
  
-@@ -13,7 +13,7 @@ Version @VERSION@ (Commit @COMMIT@) · Quelle: https://github.com/Pietwars/DisAH
+@@ -15,7 +15,7 @@ Version @VERSION@ (Commit @COMMIT@) · Quelle: https://github.com/Pietwars/DisAH
  1. Board per USB-Datenkabel an den Rechner (Chrome oder Edge am PC/Mac, nicht iPhone).
  2. https://espressif.github.io/esptool-js/ öffnen, Baudrate 921600 (bei Problemen 115200), **Connect** und den Port wählen.
     - T3-S3: Wird kein Port gefunden, **BOOT** gedrückt halten, kurz **RST** drücken, BOOT loslassen.
 -3. Bei **Flash Address** `0x0` eintragen und `DisAHRsterRadio-@ZIP@-factory.bin` wählen.
 +3. Bei **Flash Address** `0x0` eintragen und `HaldenFunk-@ZIP@-factory.bin` wählen.
- 4. Optional zuerst **Erase Flash** (löscht alles, auch gespeicherte Aushänge und das WLAN-Passwort).
+ 4. Optional zuerst **Erase Flash** (löscht alles, auch gespeicherte Aushänge und Einstellungen).
  5. **Program** und warten, bis „Leaving…“ erscheint. Dann **RST** drücken oder kurz vom Strom trennen.
  
-@@ -26,7 +26,7 @@ Jedes Gerät erzeugt beim ersten Start ein **eigenes Zufallspasswort**. So komms
- 1. In esptool-js auf **Disconnect**, dann unten im Bereich **Console** mit **115200** Baud verbinden (oder ein anderer serieller Monitor mit 115200).
- 2. **RST** drücken. Es erscheint:
-    ```
--   WLAN: DisAHRsterRadio-XXXXXX
-+   WLAN: HaldenFunk-XXXXXX
-    Passwort: xxxxxxxxxxxx
-    Browser: http://192.168.4.1
-    ```
-@@ -46,7 +46,7 @@ Nur wenn sich Weboberfläche oder Karten geändert haben: zusätzlich `teile/lit
+@@ -23,7 +23,7 @@ Die factory-Datei enthält Bootloader (@BOOT@), Partitionstabelle (0x8000), boot
+ 
+ ## 3. Verbinden
+ 
+-Am Handy das WLAN `DisAHRsterRadio-XXXXXX` auswählen und verbinden (höchstens 4 Handys). Bei „Kein Internet“ verbunden bleiben, dann `http://192.168.4.1` oder `http://disahrster.local` öffnen. Achtung: offenes, unverschlüsseltes WLAN – jede Person in Reichweite kann mitlesen und senden. Telnet ist entfernt; Konfiguration erfolgt über USB. BLE-UART ohne PIN ist in den zusätzlichen `*-ble`-Testprofilen verfügbar; deren abweichende Partitionierung beachten.
++Am Handy das WLAN `HaldenFunk-XXXXXX` auswählen und verbinden (höchstens 4 Handys). Bei „Kein Internet“ verbunden bleiben, dann `http://192.168.4.1` oder `http://haldenfunk.local` öffnen. Achtung: offenes, unverschlüsseltes WLAN – jede Person in Reichweite kann mitlesen und senden. Telnet ist entfernt; Konfiguration erfolgt über USB. BLE-UART ohne PIN ist in den zusätzlichen `*-ble`-Testprofilen verfügbar; deren abweichende Partitionierung beachten.
+ 
+ ## 4. Update (nur Firmware)
+ 
+@@ -37,7 +37,7 @@ Nur wenn sich Weboberfläche oder Karten geändert haben: zusätzlich `teile/lit
  
  | Datei | Adresse |
  |---|---|
@@ -720,7 +266,7 @@ index 8d93532..1cfbd63 100755
      src, dst = Path(sys.argv[1]), Path(sys.argv[2]); dst.mkdir(parents=True, exist_ok=True)
      for f in sorted(src.glob('*.json.gz')):
 diff --git a/web/static/index.html b/web/static/index.html
-index bb7dd12..d49f2f3 100644
+index 39c16fd..d49f2f3 100644
 --- a/web/static/index.html
 +++ b/web/static/index.html
 @@ -1,46 +1,46 @@
@@ -788,7 +334,7 @@ index bb7dd12..d49f2f3 100644
  <div class="warn">Kein zertifiziertes Notrufsystem. In Lebensgefahr immer <b>112</b> wählen, wenn irgendwie möglich.</div>
  <nav><button data-tab="chat" class="on">Chat</button><button data-tab="quick">Schnellmeldung</button><button data-tab="board">Brett</button><button data-tab="map">Karte</button><button data-tab="loc">Standort</button><button data-tab="info">Gerät</button></nav>
  <main>
-@@ -55,18 +55,20 @@ section h2,section p,.row label{text-shadow:0 1px 3px #000,0 0 8px #000}
+@@ -55,20 +55,20 @@ section h2,section p,.row label{text-shadow:0 1px 3px #000,0 0 8px #000}
  <div id="posts"></div>
  <textarea id="btext" rows="3" maxlength="170" placeholder="Aushang, z. B. „Trinkwasser-Ausgabe am Rathaus 14–17 Uhr“"></textarea>
  <div class="row"><label><input type="checkbox" id="bpin"> Wichtig / anheften</label><select id="bttl"><option value="360">6 Stunden</option><option value="1440" selected>1 Tag</option><option value="4320">3 Tage</option><option value="10080">7 Tage</option></select><button class="b" id="bsend" type="button">Aushängen</button></div></section>
@@ -803,9 +349,9 @@ index bb7dd12..d49f2f3 100644
 -<p id="gpsres" class="muted"></p><h2>Orte im Ahrtal</h2><div class="places" id="pl"></div></section>
 +<p id="gpsres" class="muted"></p><h2>Orte im Mansfelder Land &amp; am Harzrand</h2><div class="places" id="pl"></div></section>
  <section id="info"><h2>Gerät</h2><table id="it"></table>
+ <h2>Funkprofil</h2><p class="muted">⚠ Alle Geräte im Netz müssen <b>dasselbe Funkprofil</b> nutzen, sonst hören sie sich nicht. Alle Profile liegen im Teilband 869,4–869,65 MHz (max. 500 mW ERP, 10 % Sendezeit pro Stunde – die Firmware hält Pakete zurück, wenn das Budget aufgebraucht ist). Änderung startet das Gerät neu.</p>
+ <form id="pf" onsubmit="return false" style="display:block"><select id="psel" class="b b2" style="width:100%;max-width:100%;margin-bottom:8px;font-size:15px"></select><button class="b" id="pset" type="button" style="width:100%">Übernehmen &amp; neu starten</button></form><p id="pres" class="muted"></p>
 -<p class="muted">Basiert auf <a href="https://github.com/sudomesh/disaster-radio" style="color:var(--sage)">sudomesh/disaster-radio</a> (GPLv3/AGPLv3).</p><p class="muted" id="uiver">Weboberfläche DisAHRsterRadio 0.0.0-dev</p></section>
-+<h2>Funkprofil</h2><p class="muted">⚠ Alle Geräte im Netz müssen <b>dasselbe Funkprofil</b> nutzen, sonst hören sie sich nicht. Alle Profile liegen im Teilband 869,4–869,65 MHz (max. 500 mW ERP, 10 % Sendezeit pro Stunde – die Firmware hält Pakete zurück, wenn das Budget aufgebraucht ist). Änderung startet das Gerät neu.</p>
-+<form id="pf" onsubmit="return false" style="display:block"><select id="psel" class="b b2" style="width:100%;max-width:100%;margin-bottom:8px;font-size:15px"></select><button class="b" id="pset" type="button" style="width:100%">Übernehmen &amp; neu starten</button></form><p id="pres" class="muted"></p>
 +<p class="muted">Basiert auf <a href="https://github.com/sudomesh/disaster-radio" style="color:var(--sage)">sudomesh/disaster-radio</a> (GPLv3/AGPLv3). Regionalvariante von <a href="https://github.com/Pietwars/DisAHRsterRadio" style="color:var(--sage)">DisAHRsterRadio</a>.</p><p class="muted" id="uiver">Weboberfläche HaldenFunk 0.0.0-dev</p></section>
  </main>
  <script>
@@ -814,30 +360,25 @@ index bb7dd12..d49f2f3 100644
  const QUICK=[['H','Trinkwasser benötigt, Personen: ','💧','Trinkwasser'],['H','Strom zum Laden benötigt (Handy/Gerät)','⚡','Strom / Laden'],['H','Medikamente benötigt: ','💊','Medikamente'],['H','Verletzte Person, Hilfe benötigt','🚑','Verletzt'],['I','Evakuierung / Sammelpunkt: ','🏃','Evakuierung'],['I','Mir geht es gut, bin hier erreichbar','✅','Mir geht es gut'],['A','Biete Hilfe an: ','🤝','Ich biete Hilfe'],['A','Strom/Ladestation verfügbar','🔋','Strom vorhanden']];
  const KIND={H:'HILFE',I:'INFO',A:'ANGEBOT'};
  const $=s=>document.querySelector(s),enc=new TextEncoder(),dec=new TextDecoder();
-@@ -103,12 +105,18 @@ $('#pl').onclick=e=>{const b=e.target.closest('button');if(!b)return;const p=PLA
+@@ -105,7 +105,7 @@ $('#pl').onclick=e=>{const b=e.target.closest('button');if(!b)return;const p=PLA
  $('#gps').onclick=()=>{if(!navigator.geolocation)return $('#gpsres').textContent='Kein GPS im Browser verfügbar.';$('#gpsres').textContent='Suche Position …';
   navigator.geolocation.getCurrentPosition(p=>{myPos=p.coords.latitude.toFixed(5)+','+p.coords.longitude.toFixed(5)+' (±'+Math.round(p.coords.accuracy)+' m)';localStorage.setItem('dar-pos',myPos);setMe(p.coords.latitude,p.coords.longitude);$('#gpsres').textContent='Position: '+myPos;who()},
   e=>{$('#gpsres').textContent='GPS nicht möglich ('+e.message+'). Bitte Ort aus der Liste wählen.'},{enableHighAccuracy:true,timeout:15000})};
--async function info(){let d;try{d=DEMO?{name:'DisAHRsterRadio',version:'0.0.0-dev',board:'LILYGO T3-S3 SX1262',node:'a1b2c3d4',ssid:'DisAHRsterRadio-B2C3D4',lora:true,freq:869.525,sf:9,txPower:14,routes:2,clients:3,sd:false,uptime:4711,heap:151552,minHeap:118784,maxBlock:65524,heapWarn:40960}:await (await fetch('/api/info')).json()}catch(e){$('#it').innerHTML='<tr><td>Keine Gerätedaten</td></tr>';return}
-- const L={board:'Board',version:'Firmware',node:'Knotenadresse',ssid:'WLAN',lora:'LoRa aktiv',freq:'Frequenz (MHz)',sf:'Spreizfaktor',txPower:'Sendeleistung (dBm)',routes:'Routen',clients:'Verbundene Clients',sd:'SD-Karte',uptime:'Laufzeit (s)',heap:'Freier Speicher',minHeap:'Minimum seit Start',maxBlock:'Größter freier Block'};
+-async function info(){let d;try{d=DEMO?{name:'DisAHRsterRadio',version:'0.0.0-dev',board:'LILYGO T3-S3 SX1262',node:'a1b2c3d4',ssid:'DisAHRsterRadio-B2C3D4',lora:true,preset:0,presetId:'eu-narrow',presetName:'EU Narrow (Standard)',freq:869.618,bw:62.5,sf:8,cr:'4/8',airtimeMs:12840,airtimeBudgetMs:360000,airtimePct:0.36,dutyLimitPct:10,txDeferred:0,txPower:14,routes:2,clients:3,sd:false,uptime:4711,heap:151552,minHeap:118784,maxBlock:65524,heapWarn:40960}:await (await fetch('/api/info')).json()}catch(e){$('#it').innerHTML='<tr><td>Keine Gerätedaten</td></tr>';return}
 +async function info(){let d;try{d=DEMO?{name:'HaldenFunk',version:'0.0.0-dev',board:'LILYGO T3-S3 SX1262',node:'a1b2c3d4',ssid:'HaldenFunk-B2C3D4',lora:true,preset:0,presetId:'eu-narrow',presetName:'EU Narrow (Standard)',freq:869.618,bw:62.5,sf:8,cr:'4/8',airtimeMs:12840,airtimeBudgetMs:360000,airtimePct:0.36,dutyLimitPct:10,txDeferred:0,txPower:14,routes:2,clients:3,sd:false,uptime:4711,heap:151552,minHeap:118784,maxBlock:65524,heapWarn:40960}:await (await fetch('/api/info')).json()}catch(e){$('#it').innerHTML='<tr><td>Keine Gerätedaten</td></tr>';return}
-+ const L={board:'Board',version:'Firmware',node:'Knotenadresse',ssid:'WLAN',lora:'LoRa aktiv',presetName:'Funkprofil',freq:'Frequenz (MHz)',bw:'Bandbreite (kHz)',sf:'Spreizfaktor',cr:'Coderate',airtimeMs:'Sendezeit letzte Stunde',txDeferred:'Wegen Sendezeit zurückgehalten',txPower:'Sendeleistung (dBm)',routes:'Routen',clients:'Verbundene Clients',sd:'SD-Karte',uptime:'Laufzeit (s)',heap:'Freier Speicher',minHeap:'Minimum seit Start',maxBlock:'Größter freier Block'};
+  const L={board:'Board',version:'Firmware',node:'Knotenadresse',ssid:'WLAN',lora:'LoRa aktiv',presetName:'Funkprofil',freq:'Frequenz (MHz)',bw:'Bandbreite (kHz)',sf:'Spreizfaktor',cr:'Coderate',airtimeMs:'Sendezeit letzte Stunde',txDeferred:'Wegen Sendezeit zurückgehalten',txPower:'Sendeleistung (dBm)',routes:'Routen',clients:'Verbundene Clients',sd:'SD-Karte',uptime:'Laufzeit (s)',heap:'Freier Speicher',minHeap:'Minimum seit Start',maxBlock:'Größter freier Block'};
   const W=d.heapWarn||40960,KB=v=>Math.round(v/1024)+' KB';
-- $('#it').innerHTML=Object.keys(L).filter(k=>d[k]!==undefined).map(k=>{const h=/^(heap|minHeap|maxBlock)$/.test(k),low=(k=='heap'||k=='minHeap')&&d[k]<W;return '<tr><td>'+L[k]+'</td><td'+(low?' class="heaplow"':'')+'>'+esc(h?KB(d[k])+(low?' ⚠ unter '+KB(W):''):String(d[k]===true?'ja':d[k]===false?'nein':d[k]))+'</td></tr>'}).join('')}
-+ $('#it').innerHTML=Object.keys(L).filter(k=>d[k]!==undefined).map(k=>{const h=/^(heap|minHeap|maxBlock)$/.test(k),low=(k=='heap'||k=='minHeap')&&d[k]<W;return '<tr><td>'+L[k]+'</td><td'+(low?' class="heaplow"':'')+'>'+esc(h?KB(d[k])+(low?' ⚠ unter '+KB(W):''):(k=='airtimeMs'?(d[k]/1000).toFixed(1)+' s von '+Math.round((d.airtimeBudgetMs||360000)/1000)+' s ('+(d.airtimePct||0).toFixed(1)+' % / max. '+(d.dutyLimitPct||10)+' %)':String(d[k]===true?'ja':d[k]===false?'nein':d[k])))+'</td></tr>'}).join('')}
- setInterval(()=>{if($('#info').classList.contains('on'))info()},10000);
+  $('#it').innerHTML=Object.keys(L).filter(k=>d[k]!==undefined).map(k=>{const h=/^(heap|minHeap|maxBlock)$/.test(k),low=(k=='heap'||k=='minHeap')&&d[k]<W;return '<tr><td>'+L[k]+'</td><td'+(low?' class="heaplow"':'')+'>'+esc(h?KB(d[k])+(low?' ⚠ unter '+KB(W):''):(k=='airtimeMs'?(d[k]/1000).toFixed(1)+' s von '+Math.round((d.airtimeBudgetMs||360000)/1000)+' s ('+(d.airtimePct||0).toFixed(1)+' % / max. '+(d.dutyLimitPct||10)+' %)':String(d[k]===true?'ja':d[k]===false?'nein':d[k])))+'</td></tr>'}).join('')}
+@@ -116,7 +116,7 @@ $('#pset').onclick=async()=>{const v=$('#psel').value;if(!confirm('Funkprofil we
+  if(DEMO){$('#pres').textContent='Demo: Profil gespeichert (kein Neustart).';return}
+  try{const r=await fetch('/api/preset',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'preset='+v});$('#pres').textContent=r.ok?'Gespeichert – Gerät startet neu, bitte in ca. 20 s neu verbinden.':'Fehler: '+await r.text()}catch(e){$('#pres').textContent='Gerät startet neu …'}};
+ presets();
 -function demo(){status(1);if(!name){name='Peter';}[ '~ Anna joined the channel','<Anna> Heimersheim: Wasser steht in der Bachstraße, Brücke gesperrt.','<Jonas> [HILFE] Trinkwasser benötigt, Personen: 4 @ Lohrsdorf (50.5515,7.1865)','<Peter> Bin auf dem Weg, bringe 2 Kanister mit.','<Mia> [ANGEBOT] Strom/Ladestation verfügbar @ Bad Neuenahr (50.5449,7.1377)'].forEach(t=>show(t,t.startsWith('<Peter>')?'self':''))}
-+async function presets(){let l,cur=0;try{l=DEMO?[{i:0,id:'eu-narrow',name:'EU Narrow (Standard)',freq:869.618,bw:62.5,sf:8,cr:8,duty:10},{i:1,id:'nah',name:'Nah/Schnell',freq:869.525,bw:250,sf:7,cr:5,duty:10},{i:2,id:'mittel',name:'Mittel (bisheriger Standard)',freq:869.525,bw:125,sf:9,cr:5,duty:10},{i:3,id:'fern',name:'Fern',freq:869.525,bw:125,sf:12,cr:8,duty:10},{i:4,id:'longfast',name:'LongFast-aehnlich',freq:869.525,bw:250,sf:11,cr:5,duty:10}]:await (await fetch('/api/presets')).json();const d=DEMO?{preset:0}:await (await fetch('/api/info')).json();cur=d.preset||0}catch(e){return}
-+ $('#psel').innerHTML=l.map(p=>'<option value="'+p.i+'"'+(p.i==cur?' selected':'')+'>'+esc(p.name)+' · '+String(p.freq).replace('.',',')+' MHz · '+String(p.bw).replace('.',',')+' kHz · SF'+p.sf+' · CR 4/'+p.cr+'</option>').join('')}
-+$('#pset').onclick=async()=>{const v=$('#psel').value;if(!confirm('Funkprofil wechseln? Alle anderen Geräte im Netz müssen dasselbe Profil bekommen. Das Gerät startet neu.'))return;
-+ if(DEMO){$('#pres').textContent='Demo: Profil gespeichert (kein Neustart).';return}
-+ try{const r=await fetch('/api/preset',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'preset='+v});$('#pres').textContent=r.ok?'Gespeichert – Gerät startet neu, bitte in ca. 20 s neu verbinden.':'Fehler: '+await r.text()}catch(e){$('#pres').textContent='Gerät startet neu …'}};
-+presets();
 +function demo(){status(1);if(!name){name='Peter';}[ '~ Anna joined the channel','<Anna> Glück Auf! Sangerhausen: Strom seit 2 h weg, Netz down.','<Jonas> [HILFE] Trinkwasser benötigt, Personen: 4 @ Wallhausen (51.4580,11.2050)','<Peter> Bin auf dem Weg, bringe 2 Kanister mit.','<Mia> [ANGEBOT] Strom/Ladestation verfügbar @ Lutherstadt Eisleben (51.5279,11.5480)','<Karl> Knoten auf der Hohen Linde läuft, Reichweite bis Allstedt 👍'].forEach(t=>show(t,t.startsWith('<Peter>')?'self':''))}
  
  /* ---------- Schwarzes Brett ---------- */
  let posts={};
-@@ -132,26 +140,26 @@ function notePos(t,who,brett){const m=String(t).match(/(-?\d{1,2}\.\d{3,})\s*,\s
+@@ -140,26 +140,26 @@ function notePos(t,who,brett){const m=String(t).match(/(-?\d{1,2}\.\d{3,})\s*,\s
  async function getMap(k){if(MAPS[k])return MAPS[k];let r=await fetch('map/'+k+'.json').catch(()=>null);let d;
   if(r&&r.ok&&(r.headers.get('content-type')||'').includes('json'))d=await r.json();else{r=await fetch('map/'+k+'.json.gz');d=JSON.parse(await new Response(r.body.pipeThrough(new DecompressionStream('gzip'))).text())}
   d.l.forEach(l=>{for(let i=3;i<l.length;i+=2){l[i]+=l[i-2];l[i+1]+=l[i-1]}});return MAPS[k]=d}
@@ -872,7 +413,7 @@ index bb7dd12..d49f2f3 100644
  let pts=new Map(),last=null;
  cv.onpointerdown=e=>{cv.setPointerCapture(e.pointerId);pts.set(e.pointerId,[e.clientX,e.clientY])};
  cv.onpointermove=e=>{if(!pts.has(e.pointerId)||!view)return;const o=pts.get(e.pointerId);
-@@ -164,10 +172,10 @@ function zoom(f){if(!view)return;view.s=Math.max(2000,Math.min(400000,view.s*f))
+@@ -172,10 +172,10 @@ function zoom(f){if(!view)return;view.s=Math.max(2000,Math.min(400000,view.s*f))
  $('#zin').onclick=()=>zoom(1.5);$('#zout').onclick=()=>zoom(1/1.5);$('#mapfit').onclick=()=>M&&fit();
  $('#mapme').onclick=()=>{if(!me)return alert('Noch kein Standort – unter „Standort“ GPS holen oder Ort wählen.');view.la=me[0];view.lo=me[1];view.s=Math.max(view.s,30000);drawMap()};
  $('#mapsel').onchange=()=>loadMap();addEventListener('resize',()=>{if(M&&view){size();drawMap()}});

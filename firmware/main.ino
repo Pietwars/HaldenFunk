@@ -706,7 +706,7 @@ void loop()
         display.setTextAlignment(TEXT_ALIGN_LEFT);
         display.drawString(0, 16, apOk ? "WLAN:" : "WLAN FEHLER:");
         display.drawString(0, 28, ssid);
-        display.drawString(0, 40, String("WLAN offen / ohne Passwort"));
+        display.drawString(0, 40, "offen, ohne Passwort");
         display.drawString(0, 52, WiFi.softAPIP().toString());
         display.display();
       }

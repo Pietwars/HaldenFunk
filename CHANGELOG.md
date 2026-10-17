@@ -5,6 +5,7 @@
 - **Zentrale Version:** Datei `VERSION` ist die einzige Quelle; `tools/version.py` schreibt `DAR_VERSION`, die neue Fußzeile „Weboberfläche HaldenFunk …“ im Gerät-Reiter, Demo-Gerätedaten und README; `--check` + `tests/version.test.py` in CI. `package.sh` und Demo-Banner lesen `VERSION`.
 - Projektfamilie: gemeinsame Tabelle mit allen fünf Repositorys.
 - **Automatische Releases:** Workflow `release.yml` baut bei jedem Tag `v*` alle drei Boards, packt `…-factory.bin`, `teile/`, `SHA256SUMS` und deutsche `ANLEITUNG.md`, prüft alles (`tools/verify_release.py`, Abbruch bei fehlender Datei) und veröffentlicht eine Vorabversion mit Text aus diesem CHANGELOG. Probelauf im Pull Request. Paketnamen jetzt mit Version: `HaldenFunk-<Version>-<Board>.zip`.
+- **Freier Speicher (Heap):** `/api/info` liefert `heap`, `minHeap`, `maxBlock`, `heapWarn` (40 KB); Gerät-Reiter zeigt KB-Werte, unter der Schwelle rot mit ⚠, Aktualisierung alle 10 s; seriell alle 30 s `[HEAP] …` mit Warnung.
 - **Feste Versionen:** pioarduino `55.03.312-1` statt `stable`, Bibliotheken exakt (AsyncTCP 3.5.0, ESPAsyncWebServer 3.12.1, RadioLib 7.8.1, OLED 4.6.2, TinyGPSPlus 1.1.0, ArduinoJson 7.4.3), CI mit `platformio==6.2.0`, `esptool==5.6.0`.
 
 ## v0.1.1-alpha – 17.10.2026 (Vorabversion)

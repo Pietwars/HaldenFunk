@@ -8,6 +8,10 @@
 
 #define DAR_VERSION "0.1.1-alpha"
 #define CLOCK_SPEED 240
+// Unter dieser Grenze freien Heaps warnen Weboberfläche (rot) und serielles [HEAP]-Protokoll
+#ifndef HEAP_WARN_BYTES
+#define HEAP_WARN_BYTES 40960
+#endif
 
 // EU868 Standard: 869.525 MHz (Teilband g3, 10 % Duty-Cycle), 125 kHz, SF9, 14 dBm
 #define LORA_DEFAULT_FREQ_MHZ 869.525f

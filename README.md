@@ -22,8 +22,9 @@ HaldenFunk ist die **Regionalvariante von [Pietwars/DisAHRsterRadio](https://git
 | [Pietwars/DisAHRsterRadio-MeshCore](https://github.com/Pietwars/DisAHRsterRadio-MeshCore) | MeshCore 1.18, kompakte Oberfläche per WLAN + Bluetooth für die MeshCore-App | 0.9.0-alpha | [Live-Demo](https://pietwars.github.io/DisAHRsterRadio-MeshCore/) · [Release](https://github.com/Pietwars/DisAHRsterRadio-MeshCore/releases/tag/v0.9.0-alpha) |
 | [Pietwars/DisAHRsterRadio](https://github.com/Pietwars/DisAHRsterRadio) | Ohne MeshCore: modernisiertes disaster-radio (LoRaLayer2, RadioLib) fürs Ahrtal | 0.1.1-dev | [Live-Demo](https://pietwars.github.io/DisAHRsterRadio/) |
 | **[Pietwars/HaldenFunk](https://github.com/Pietwars/HaldenFunk)** | Regionalvariante von DisAHRsterRadio für Sangerhausen / Mansfelder Land | 0.1.1-alpha | [Live-Demo](https://pietwars.github.io/HaldenFunk/) · [Release](https://github.com/Pietwars/HaldenFunk/releases/tag/v0.1.1-alpha) |
+| [Pietwars/HaldenFunk-MeshCore](https://github.com/Pietwars/HaldenFunk-MeshCore) | Mansfelder-Land-Variante von DisAHRsterRadio-MeshCore: MeshCore 1.18, WLAN-Oberfläche im HaldenFunk-Design + Bluetooth für die MeshCore-App, 105 Geräte | 0.1.0-alpha | [Live-Demo](https://pietwars.github.io/HaldenFunk-MeshCore/) · [Release](https://github.com/Pietwars/HaldenFunk-MeshCore/releases/tag/v0.1.0-alpha) |
 
-DisasterMesh und DisAHRsterRadio-MeshCore sprechen MeshCore und sind **nicht** funkkompatibel zu DisAHRsterRadio/HaldenFunk.
+DisasterMesh, DisAHRsterRadio-MeshCore und HaldenFunk-MeshCore sprechen MeshCore und sind **nicht** funkkompatibel zu DisAHRsterRadio/HaldenFunk.
 
 ## Ehrlicher Stand (Oktober 2026)
 

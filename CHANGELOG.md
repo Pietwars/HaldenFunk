@@ -1,5 +1,11 @@
 # Changelog – HaldenFunk
 
+## v0.1.1-alpha – 17.10.2026 (Vorabversion)
+
+- **Offline-Karten verkleinert** (`tools/shrink_maps.py`, gleiche Dateien wie HaldenFunk-MeshCore): Linien vereinfacht (Douglas-Peucker), Koordinaten gerastert, auf den Kartenausschnitt zugeschnitten, kleine Wald-/Wasserflächen und kurze Wegstücke weggelassen; Orte, Halden und Schächte vollständig. Alle Karten 633 KB → 223 KB, Übersicht Mansfelder Land 335 KB → 90 KB – mehr Platz im LittleFS (u. a. für das Schwarze Brett), schnelleres Laden im Browser.
+- Live-Demo und Vorschaubild der Karte aktualisiert; Firmwarekennung `0.1.1-alpha`.
+- Release-Pakete enthalten je Board `factory.bin`, `teile/firmware.bin`, `teile/littlefs.bin` (Weboberfläche + Karten), Bootloader, Partitionstabelle, `boot_app0.bin`, `SHA256SUMS` und `ANLEITUNG.md` (CI-Artefakt enthält jetzt firmware.bin und littlefs.bin, PR #1).
+
 ## v0.1.0-alpha – 17.10.2026 (Vorabversion)
 
 Erste Version der Regionalvariante von [DisAHRsterRadio](https://github.com/Pietwars/DisAHRsterRadio) für Sangerhausen und das Mansfelder Land.

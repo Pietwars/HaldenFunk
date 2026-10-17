@@ -6,7 +6,7 @@
 
 ![HaldenFunk – Halden, Förderturm und Funkwellen](docs/images/haldenfunk-header.jpg)
 
-**Version 0.1.0-alpha** (Vorabversion) · [Release v0.1.0-alpha mit Firmware](https://github.com/Pietwars/HaldenFunk/releases/tag/v0.1.0-alpha) · disaster-radio/LoRaLayer2 + RadioLib 7 · 868 MHz · **Flyer (A5):** [Druck-PDF mit QR-Codes](docs/flyer/HaldenFunk-Flyer.pdf) · [Digital-PDF mit klickbaren Links](docs/flyer/HaldenFunk-Flyer-digital.pdf) · [Änderungen](CHANGELOG.md)
+**Version 0.1.1-alpha** (Vorabversion) · [Release v0.1.1-alpha mit Firmware](https://github.com/Pietwars/HaldenFunk/releases/tag/v0.1.1-alpha) · disaster-radio/LoRaLayer2 + RadioLib 7 · 868 MHz · **Flyer (A5):** [Druck-PDF mit QR-Codes](docs/flyer/HaldenFunk-Flyer.pdf) · [Digital-PDF mit klickbaren Links](docs/flyer/HaldenFunk-Flyer-digital.pdf) · [Änderungen](CHANGELOG.md)
 
 **Offline-Chat über LoRa-Mesh für Sangerhausen, das Mansfelder Land, die Goldene Aue und den Harzrand.** Ein Gerät spannt ein eigenes WLAN auf, man verbindet sich mit dem Handy und schreibt im Browser. Die Nachrichten laufen per LoRa von Gerät zu Gerät weiter – ganz ohne Internet, Strom aus der Steckdose oder Mobilfunk. Ideale Standorte für Knoten: Halden, Fördertürme, Kirchtürme, Dächer am Harzrand.
 
@@ -21,7 +21,7 @@ HaldenFunk ist die **Regionalvariante von [Pietwars/DisAHRsterRadio](https://git
 | [Pietwars/DisasterMesh](https://github.com/Pietwars/DisasterMesh) | Original-Repo: MeshCore 1.18 mit großer Weboberfläche MeshAhrtal, Karten, Werkzeuge | 0.9.0-alpha | [Live-Demo](https://pietwars.github.io/DisasterMesh/demo/) · [Projektseite](https://pietwars.github.io/DisasterMesh/) |
 | [Pietwars/DisAHRsterRadio-MeshCore](https://github.com/Pietwars/DisAHRsterRadio-MeshCore) | MeshCore 1.18, kompakte Oberfläche per WLAN + Bluetooth für die MeshCore-App | 0.9.0-alpha | [Live-Demo](https://pietwars.github.io/DisAHRsterRadio-MeshCore/) · [Release](https://github.com/Pietwars/DisAHRsterRadio-MeshCore/releases/tag/v0.9.0-alpha) |
 | [Pietwars/DisAHRsterRadio](https://github.com/Pietwars/DisAHRsterRadio) | Ohne MeshCore: modernisiertes disaster-radio (LoRaLayer2, RadioLib) fürs Ahrtal | 0.1.1-dev | [Live-Demo](https://pietwars.github.io/DisAHRsterRadio/) |
-| **[Pietwars/HaldenFunk](https://github.com/Pietwars/HaldenFunk)** | Regionalvariante von DisAHRsterRadio für Sangerhausen / Mansfelder Land | 0.1.0-alpha | [Live-Demo](https://pietwars.github.io/HaldenFunk/) · [Release](https://github.com/Pietwars/HaldenFunk/releases/tag/v0.1.0-alpha) |
+| **[Pietwars/HaldenFunk](https://github.com/Pietwars/HaldenFunk)** | Regionalvariante von DisAHRsterRadio für Sangerhausen / Mansfelder Land | 0.1.1-alpha | [Live-Demo](https://pietwars.github.io/HaldenFunk/) · [Release](https://github.com/Pietwars/HaldenFunk/releases/tag/v0.1.1-alpha) |
 
 DisasterMesh und DisAHRsterRadio-MeshCore sprechen MeshCore und sind **nicht** funkkompatibel zu DisAHRsterRadio/HaldenFunk.
 
@@ -55,18 +55,18 @@ Jedes ZIP enthält `factory.bin` (ab Adresse 0x0), die Einzelteile, `SHA256SUMS`
 
 <img src="docs/images/funktion-desktop.jpg" width="700" alt="Desktop-Ansicht">
 
-(Aufnahmen der [Live-Demo](https://pietwars.github.io/HaldenFunk/), Stand 0.1.0-alpha; alle Daten simuliert.)
+(Aufnahmen der [Live-Demo](https://pietwars.github.io/HaldenFunk/), Stand 0.1.1-alpha; alle Daten simuliert.)
 
 - **Gestaltung:** Kupfer und Anthrazit, Spitzkegelhalden, Förderturm als Mesh-Knoten, Funkwellen. Das Hintergrundbild ist eine eigene, mit Python/PIL erzeugte Grafik (`tools/make_bg.py`), keine Fotos
 - **Chat** an alle in Funkreichweite, **Schnellmeldungen** (Trinkwasser, Strom, Medikamente, Verletzt, Evakuierung, „Mir geht es gut“, Angebote)
 - **Schwarzes Brett** mit Weitergabe über mehrere Geräte (LittleFS, max. 30 Aushänge, Ablaufzeit 6 h – 7 Tage)
 - **Standort:** GPS des Telefons oder Ortsliste – Sangerhausen, Hohe Linde, Wallhausen, Kyffhäuser-Denkmal, Kelbra, Roßla, Allstedt, Lutherstadt Eisleben, Mansfeld, Hettstedt, Wippra, Stolberg (Harzrand)
-- **Offline-Karten** (zusammen ca. 800 KB gzip im LittleFS): Mansfelder Land · Goldene Aue (Übersicht), Sangerhausen, Lutherstadt Eisleben, Mansfeld · Hettstedt, Kelbra · Roßla · Kyffhäuser. Halden (braun) und Schächte (kupfer) werden hervorgehoben. Erzeugt mit `tools/make_map_osm.py` aus OpenStreetMap, Datenstand 17.10.2026
+- **Offline-Karten** (zusammen ca. 223 KB gzip im LittleFS, Übersicht 90 KB): Mansfelder Land · Goldene Aue (Übersicht), Sangerhausen, Lutherstadt Eisleben, Mansfeld · Hettstedt, Kelbra · Roßla · Kyffhäuser. Halden (braun) und Schächte (kupfer) werden hervorgehoben. Erzeugt mit `tools/make_map_osm.py` aus OpenStreetMap, Datenstand 17.10.2026, danach verkleinert mit `tools/shrink_maps.py` (Linien vereinfacht, Koordinaten gerastert, kleine Wald-/Wasserflächen und kurze Wegstücke weggelassen; Orte, Halden und Schächte vollständig) – gleiche Kartendateien wie in [HaldenFunk-MeshCore](https://github.com/Pietwars/HaldenFunk-MeshCore)
 - Geräteinfo über `GET /api/info`, Demo lokal mit `web/static/index.html?demo=1`
 
 ## Erste Schritte
 
-**Am einfachsten:** passendes ZIP aus dem [Release](https://github.com/Pietwars/HaldenFunk/releases/tag/v0.1.0-alpha) laden und nach `ANLEITUNG.md` flashen.
+**Am einfachsten:** passendes ZIP aus dem [Release](https://github.com/Pietwars/HaldenFunk/releases/tag/v0.1.1-alpha) laden und nach `ANLEITUNG.md` flashen.
 
 Selbst bauen:
 

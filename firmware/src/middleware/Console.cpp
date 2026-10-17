@@ -8,6 +8,7 @@
 #include "../../config.h"
 #ifndef SIM
 #include "settings/settings.h"
+#include <RadioPresets.h>
 #endif
 
 #ifdef SIM
@@ -65,7 +66,8 @@ void Console::txpowerUsage()
 
 void Console::lorafrqUsage()
 {
-  printf("'lorafrq VAL'  - sets the frequency for the LoRa transceiver,\r\n");
+  printf("'preset N'     - Funkprofil waehlen (0 EU Narrow, 1 Nah/Schnell, 2 Mittel, 3 Fern, 4 LongFast-aehnlich)\r\n");
+  printf("'lorafrq VAL'  - (veraltet) wie 'preset',\r\n");
   printf("                 where VAL is desired frequency in MHz\r\n\r\n");
 }
 
@@ -155,10 +157,15 @@ void Console::txpowerSet(std::vector<char *> args)
 
 void Console::lorafrqSet(std::vector<char *> args)
 {
-  int value;
-
+  // Frequenz/Bandbreite/SF/CR kommen jetzt aus dem Funkprofil
+  int value = -1;
   sscanf(&args[2][0], "%d", &value);
-  saveLoraFrq(value);
+  if (value < 0 || value >= RADIO_PRESET_COUNT) {
+    printf("Funkprofil 0..%d erwartet: '/set preset N' (0 = EU Narrow)\r\n", RADIO_PRESET_COUNT - 1);
+    return;
+  }
+  saveRadioPreset(value);
+  printf("Funkprofil %d (%s) gespeichert, Neustart ...\r\n", value, getRadioPreset(value).name);
   delay(500);
   ESP.restart();
 }
@@ -170,12 +177,11 @@ void Console::sfSet(std::vector<char *> args)
   int value;
 
   sscanf(&args[2][0], "%d", &value);
-  if((value < 6) || (value > 12)){
-    printf("Invalid value provided, type '/set sf VAL'\r\n");
-    sfUsage();
+  if (true) {
+    // Spreizfaktor ist Teil des Funkprofils (alle Knoten muessen gleich sein)
+    printf("SF wird ueber das Funkprofil gesetzt: '/set preset N'\r\n");
   }
   else{
-    saveSpreadingFactor(value);
     memcpy(response.destination, BROADCAST, ADDR_LENGTH);
     response.type = 'i';
     msgLen = sprintf((char *)response.message, "sf %d", value);
@@ -257,6 +263,10 @@ void Console::set(std::vector<char *> args)
   {
     printf("No value provided, type '/set txpower VAL'\r\n");
     txpowerUsage();
+  }
+  else if ((strncmp(&args[1][0], "preset", 6) == 0) && (args.size() > 2))
+  {
+    lorafrqSet(args);
   }
   else if ((strncmp(&args[1][0], "lorafrq", 7) == 0) && (args.size() > 2))
   {

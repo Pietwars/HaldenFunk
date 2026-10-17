@@ -684,7 +684,8 @@ int LL2Class::daemon(){
           Serial.printf("LL2::daemon(): transmitted packet of length: %d\r\n", length);
           #endif
           _lastTransmitTime = Layer1Class::getTime();
-          double airtime = calculateAirtime((double)length, (double)LoRa1->spreadingFactor(), 1, 0, 5, 125);
+          // Sendezeit aus RadioLib (getTimeOnAir) mit den aktiven Funkparametern statt fester SF/BW125/CR5-Formel
+          double airtime = (double)LoRa1->lastAirtimeMs();
           _dutyInterval = (int)ceil(airtime/_dutyCycle);
           _messageCount = (_messageCount + 1) % 256;
         }

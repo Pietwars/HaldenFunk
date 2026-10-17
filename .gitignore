@@ -17,4 +17,3 @@ hardware/board_esp32_v3/**
 secrets.h
 firmware/.pio
 dist/
-__pycache__/

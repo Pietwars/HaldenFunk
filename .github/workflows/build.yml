@@ -28,7 +28,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        env: [t3s3-sx1262, t3-v161-sx1276, heltec-v2-sx1276, heltec-v2-sx1276-wifi11]
+        env: [t3s3-sx1262, t3-v161-sx1276, heltec-v2-sx1276, heltec-v2-sx1276-wifi11, t3s3-sx1262-ble, t3-v161-sx1276-ble, heltec-v2-sx1276-ble]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -55,3 +55,4 @@ jobs:
           name: firmware-${{ matrix.env }}
           if-no-files-found: error
           path: artefakt/*.bin
+

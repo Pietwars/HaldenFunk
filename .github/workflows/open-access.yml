@@ -1,0 +1,13 @@
+name: Open UART regression
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  uart-bounds:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test malformed frames and MTU chunk boundaries
+        run: |
+          g++ -std=c++17 -Wall -Wextra -Werror -fsanitize=address,undefined tests/open_uart.test.cpp -o /tmp/open-uart-test
+          /tmp/open-uart-test

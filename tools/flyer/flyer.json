@@ -15,7 +15,7 @@
  ],
  "steps": [
   "Firmware aus dem Release auf das LoRa-Board flashen, Antenne und Strom anschließen.",
-  "Handy mit dem WLAN <b>HaldenFunk-XXXXXX</b> verbinden (Passwort: USB-Seriell / OLED).",
+  "Handy mit dem WLAN <b>HaldenFunk-XXXXXX</b> verbinden (offenes WLAN).",
   "Im Browser <b>192.168.4.1</b> öffnen – chatten, melden, Karte nutzen."
  ],
  "repo": "https://github.com/Pietwars/HaldenFunk",

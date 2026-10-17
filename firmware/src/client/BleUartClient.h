@@ -10,7 +10,6 @@
 #include <BLEDevice.h>
 #include <BLEAdvertising.h>
 #include <BLE2902.h>
-#include <esp_bt_device.h>
 
 #include "server/DisasterRadio.h"
 #include "middleware/HistoryReplay.h"

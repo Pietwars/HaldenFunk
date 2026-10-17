@@ -1,17 +1,17 @@
 diff --git a/.github/workflows/build.yml b/.github/workflows/build.yml
-index b1d46a1..6664bdd 100644
+index e203a09..ba4f036 100644
 --- a/.github/workflows/build.yml
 +++ b/.github/workflows/build.yml
-@@ -50,3 +50,4 @@ jobs:
+@@ -55,3 +55,4 @@ jobs:
            name: firmware-${{ matrix.env }}
            if-no-files-found: error
            path: artefakt/*.bin
 +
 diff --git a/.github/workflows/release.yml b/.github/workflows/release.yml
-index 2b5ae75..d9ea22f 100644
+index 0a8ccf6..e5179a7 100644
 --- a/.github/workflows/release.yml
 +++ b/.github/workflows/release.yml
-@@ -57,11 +57,11 @@ jobs:
+@@ -62,11 +62,11 @@ jobs:
        - name: Pakete prüfen (Vollständigkeit, Prüfsummen, Version)
          run: |
            V=$(python3 tools/version.py --get)
@@ -26,7 +26,7 @@ index 2b5ae75..d9ea22f 100644
              "t3s3=LILYGO T3-S3 V1.3 (SX1262)" "t3-v161=LILYGO T3 V1.6.1 (SX1276)" "heltec-v2=Heltec WiFi LoRa 32 V2 (SX1276)" | tee notes.md
        - name: Vorabversion veröffentlichen
          if: env.TAG != ''
-@@ -73,6 +73,6 @@ jobs:
+@@ -78,6 +78,6 @@ jobs:
            if gh release view "$TAG" >/dev/null 2>&1; then
              gh release upload "$TAG" $ASSETS --clobber
            else

@@ -1,0 +1,15 @@
+# Regionale Dateien: gehören allein HaldenFunk und werden nicht aus dem Kern (DisAHRsterRadio) erzeugt
+README.md
+CHANGELOG.md
+VERSION
+docs/*
+region/*
+web/static/map/*
+web/static/bg.jpg
+web/static/bg.webp
+web/static/icon.png
+tools/version.py
+tools/make_bg.py
+tools/make_map_osm.py
+tools/core_sync.py
+tools/flyer/flyer.json

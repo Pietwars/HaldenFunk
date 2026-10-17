@@ -1,5 +1,10 @@
 # Changelog – HaldenFunk
 
+## Unveröffentlicht · 17.10.2026
+
+- **Zentrale Version:** Datei `VERSION` ist die einzige Quelle; `tools/version.py` schreibt `DAR_VERSION`, die neue Fußzeile „Weboberfläche HaldenFunk …“ im Gerät-Reiter, Demo-Gerätedaten und README; `--check` + `tests/version.test.py` in CI. `package.sh` und Demo-Banner lesen `VERSION`.
+- Projektfamilie: gemeinsame Tabelle mit allen fünf Repositorys.
+
 ## v0.1.1-alpha – 17.10.2026 (Vorabversion)
 
 - **Offline-Karten verkleinert** (`tools/shrink_maps.py`, gleiche Dateien wie HaldenFunk-MeshCore): Linien vereinfacht (Douglas-Peucker), Koordinaten gerastert, auf den Kartenausschnitt zugeschnitten, kleine Wald-/Wasserflächen und kurze Wegstücke weggelassen; Orte, Halden und Schächte vollständig. Alle Karten 633 KB → 223 KB, Übersicht Mansfelder Land 335 KB → 90 KB – mehr Platz im LittleFS (u. a. für das Schwarze Brett), schnelleres Laden im Browser.

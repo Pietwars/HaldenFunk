@@ -20,12 +20,12 @@ jobs:
           path: ~/.platformio
           key: pio-${{ matrix.env }}-${{ hashFiles('firmware/platformio.ini') }}
       - run: pip install -U platformio
-      - name: Firmware bauen
-        working-directory: firmware
-        run: pio run -e ${{ matrix.env }}
       - name: Dateisystem (Web-UI) bauen
         working-directory: firmware
         run: pio run -e ${{ matrix.env }} -t buildfs
+      - name: Firmware bauen
+        working-directory: firmware
+        run: pio run -e ${{ matrix.env }}
       - uses: actions/upload-artifact@v4
         with:
           name: firmware-${{ matrix.env }}

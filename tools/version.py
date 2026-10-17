@@ -17,8 +17,8 @@ def load():
         line = line.strip()
         if line and not line.startswith('#'):
             k, v = line.split('=', 1); d[k.strip()] = v.strip()
-    if not re.fullmatch(r'\d+\.\d+\.\d+(-[0-9A-Za-z.]+)?', d.get('VERSION', '')):
-        sys.exit('VERSION: ungültige oder fehlende Zeile VERSION=x.y.z[-zusatz]')
+    if not re.fullmatch(r'\d+\.\d+\.\d+(-(alpha|beta|rc|dev)[0-9.]*)?', d.get('VERSION', '')):
+        sys.exit('VERSION: ungültige oder fehlende Zeile VERSION=x.y.z[-alpha|-beta|-rc|-dev]')
     return d
 
 def run(rules, argv):

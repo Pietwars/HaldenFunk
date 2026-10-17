@@ -10,7 +10,7 @@ with tempfile.TemporaryDirectory() as d:
     shutil.copytree(ROOT, tmp, ignore=shutil.ignore_patterns('.git', '.pio', 'node_modules', 'dist', '_site', 'test-results', '*.bin', 'docs'))
     shutil.copytree(ROOT / 'docs', tmp / 'docs', ignore=shutil.ignore_patterns('images', '*.pdf', '*.jpg', '*.png', 'demo'), dirs_exist_ok=True)
     v = (tmp / 'VERSION').read_text(encoding='utf-8')
-    (tmp / 'VERSION').write_text(v.replace('VERSION=', 'VERSION=9.9.9-test\n#', 1), encoding='utf-8')
+    (tmp / 'VERSION').write_text(v.replace('VERSION=', 'VERSION=9.9.9-rc1\n#', 1), encoding='utf-8')
     bad = subprocess.run([sys.executable, str(tmp / 'tools/version.py'), '--check'], capture_output=True, text=True)
     assert bad.returncode != 0 and 'ABWEICHUNG' in bad.stdout, 'Abweichende Version wurde nicht erkannt'
     subprocess.run([sys.executable, str(tmp / 'tools/version.py')], check=True, capture_output=True)

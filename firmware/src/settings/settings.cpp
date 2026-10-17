@@ -10,6 +10,7 @@ int spreadingFactor = 9;
 double dutyCycle = .1;
 long routeInterval = 10000;
 long beaconPeriod = 0;
+int radioPreset = 0; // 0 = EU Narrow (869,618 MHz, 62,5 kHz, SF8, CR 4/8)
 
 void getSettings(void)
 {
@@ -47,6 +48,8 @@ void getSettings(void)
   routeInterval = preferences.getLong("interval", routeInterval);
   Serial.printf("Got interval setting %ld\n", routeInterval);
   beaconPeriod = preferences.getLong("gps", beaconPeriod);
+  radioPreset = preferences.getInt("preset", radioPreset);
+  Serial.printf("Got preset setting %d\n", radioPreset);
   Serial.printf("Got gps setting %ld\n", beaconPeriod);
 
   preferences.end();
@@ -154,5 +157,16 @@ void saveGPS(long period)
   }
 
   preferences.putLong("gps", period);
+  preferences.end();
+}
+
+void saveRadioPreset(int preset)
+{
+  if (!preferences.begin("dr", false))
+  {
+    Serial.println("Error opening preferences");
+    return;
+  }
+  preferences.putInt("preset", preset);
   preferences.end();
 }

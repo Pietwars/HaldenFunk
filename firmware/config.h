@@ -13,8 +13,9 @@
 #define HEAP_WARN_BYTES 40960
 #endif
 
-// EU868 Standard: 869.525 MHz (Teilband g3, 10 % Duty-Cycle), 125 kHz, SF9, 14 dBm
-#define LORA_DEFAULT_FREQ_MHZ 869.525f
+// Funkparameter: Funkprofile in lib/LoRaLayer2/src/RadioPresets.h
+// Standard "EU Narrow": 869.618 MHz, 62.5 kHz, SF8, CR 4/8 (Teilband 869,4-869,65 MHz, 10 %, max. 500 mW ERP)
+#define LORA_DEFAULT_FREQ_MHZ 869.618f
 
 #ifndef STARTUP_STAGGER_MS
 #define STARTUP_STAGGER_MS 150

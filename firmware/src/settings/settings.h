@@ -11,6 +11,7 @@ void saveSpreadingFactor(int spreadFactor);
 void saveDutyCycle(double dutyCycle);
 void saveInterval(long interval);
 void saveGPS(long period);
+void saveRadioPreset(int preset);
 
 extern String username;
 extern bool useBLE;
@@ -20,3 +21,4 @@ extern int spreadingFactor;
 extern double dutyCycle;
 extern long routeInterval;
 extern long beaconPeriod;
+extern int radioPreset; // Index in RADIO_PRESETS (RadioPresets.h)

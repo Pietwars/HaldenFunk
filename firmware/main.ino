@@ -24,6 +24,7 @@
 #include <Layer1_RadioLib.h>
 
 #include <LoRaLayer2.h>
+#include <RadioPresets.h>
 
 // server
 #include "server/DisasterRadio.h"
@@ -91,8 +92,10 @@ LL2Class *LL2;
 
 #include "settings/settings.h"
 
-// 869 (Standard) => 869.525 MHz, sonst ganzzahliger Wert aus den Einstellungen
-float loraFreqMHz() { return loraFrq == 869 ? LORA_DEFAULT_FREQ_MHZ : (float)loraFrq; }
+// Funkprofil aus den Einstellungen (RadioPresets.h); Frequenz/BW/SF/CR kommen nur noch von dort
+const RadioPreset &activePreset() { return getRadioPreset(radioPreset); }
+float loraFreqMHz() { return activePreset().freqMHz; }
+Layer1Class *Layer1_main = NULL;
 
 DisasterRadio *radio = new DisasterRadio();
 DisasterHistory *history = NULL;
@@ -284,15 +287,40 @@ void setupHTTPSever()
   }
 
   http_server.on("/api/info", HTTP_GET, [](AsyncWebServerRequest *request) {
-    char json[512];
+    char json[768];
     snprintf(json, sizeof(json),
              "{\"name\":\"HaldenFunk\",\"version\":\"%s\",\"board\":\"%s\",\"node\":\"%s\",\"ssid\":\"%s\","
-             "\"lora\":%s,\"freq\":%.3f,\"sf\":%d,\"txPower\":%d,\"routes\":%d,\"clients\":%d,\"sd\":%s,\"uptime\":%lu,"
+             "\"lora\":%s,\"preset\":%d,\"presetId\":\"%s\",\"presetName\":\"%s\",\"freq\":%.3f,\"bw\":%.1f,\"sf\":%d,\"cr\":\"4/%d\",\"airtimeMs\":%lu,\"airtimeBudgetMs\":%lu,\"airtimePct\":%.2f,\"dutyLimitPct\":%.0f,\"txDeferred\":%lu,\"txPower\":%d,\"routes\":%d,\"clients\":%d,\"sd\":%s,\"uptime\":%lu,"
              "\"heap\":%u,\"minHeap\":%u,\"maxBlock\":%u,\"heapWarn\":%u}",
-             DAR_VERSION, BOARD_NAME, nodeAddress, ssid, loraInitialized ? "true" : "false", loraFreqMHz(), spreadingFactor,
+             DAR_VERSION, BOARD_NAME, nodeAddress, ssid, loraInitialized ? "true" : "false", radioPreset, activePreset().id, activePreset().name, loraFreqMHz(), activePreset().bwKHz, activePreset().sf, activePreset().cr,
+             (unsigned long)(Layer1_main ? Layer1_main->airtimeUsedMs() : 0), (unsigned long)(activePreset().dutyLimit * 3600000.0f),
+             Layer1_main ? Layer1_main->airtimeUsedMs() / 36000.0f : 0.0f, activePreset().dutyLimit * 100.0f, (unsigned long)(Layer1_main ? Layer1_main->deferredCount() : 0),
              txPower, routes, clients, sdInitialized ? "true" : "false", (unsigned long)(millis() / 1000),
              (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMinFreeHeap(), (unsigned)ESP.getMaxAllocHeap(), (unsigned)HEAP_WARN_BYTES);
     request->send(200, "application/json", json);
+  });
+
+  // Funkprofile auflisten / waehlen (gespeichert im NVS, wirksam nach Neustart)
+  http_server.on("/api/presets", HTTP_GET, [](AsyncWebServerRequest *request) {
+    String j = "[";
+    for (int i = 0; i < RADIO_PRESET_COUNT; i++) {
+      const RadioPreset &p = RADIO_PRESETS[i];
+      char b[200];
+      snprintf(b, sizeof(b), "%s{\"i\":%d,\"id\":\"%s\",\"name\":\"%s\",\"freq\":%.3f,\"bw\":%.1f,\"sf\":%d,\"cr\":%d,\"duty\":%.0f}",
+               i ? "," : "", i, p.id, p.name, p.freqMHz, p.bwKHz, p.sf, p.cr, p.dutyLimit * 100.0f);
+      j += b;
+    }
+    request->send(200, "application/json", j + "]");
+  });
+  http_server.on("/api/preset", HTTP_POST, [](AsyncWebServerRequest *request) {
+    if (!request->hasParam("preset", true)) { request->send(400, "text/plain", "preset fehlt"); return; }
+    int p = request->getParam("preset", true)->value().toInt();
+    if (p < 0 || p >= RADIO_PRESET_COUNT) { request->send(400, "text/plain", "ungueltiges Profil"); return; }
+    saveRadioPreset(p);
+    request->send(200, "application/json", "{\"ok\":true,\"restart\":true}");
+    static esp_timer_handle_t t = NULL;
+    if (!t) { esp_timer_create_args_t a = {}; a.callback = [](void *) { ESP.restart(); }; a.name = "rst"; esp_timer_create(&a, &t); }
+    esp_timer_start_once(t, 1500000);
   });
 
   http_server.on("/api/board", HTTP_GET, [](AsyncWebServerRequest *request) {
@@ -429,11 +457,13 @@ void setupLoRa()
   pinMode(LORA2_CS, OUTPUT);
   digitalWrite(LORA2_CS, HIGH);
   #endif
-  Layer1Class *Layer1_1 = new Layer1Class(&lora, 0, LORA_CS, LORA_RST, LORA_IRQ, spreadingFactor, loraFreqMHz(), txPower, 125.0, LORA_TCXO);
+  const RadioPreset &rp = activePreset();
+  Layer1Class *Layer1_1 = new Layer1Class(&lora, 0, LORA_CS, LORA_RST, LORA_IRQ, rp.sf, rp.freqMHz, txPower, rp.bwKHz, LORA_TCXO, rp.cr, rp.dutyLimit);
+  Layer1_main = Layer1_1;
   #ifdef DUAL_LORA
   digitalWrite(LORA_CS, HIGH);
   digitalWrite(LORA2_CS, LOW);
-  Layer1Class *Layer1_2 = new Layer1Class(&lora2, 0, LORA2_CS, LORA2_RST, LORA2_IRQ, 7, loraFreqMHz(), txPower, 125.0, LORA_TCXO);
+  Layer1Class *Layer1_2 = new Layer1Class(&lora2, 0, LORA2_CS, LORA2_RST, LORA2_IRQ, rp.sf, rp.freqMHz, txPower, rp.bwKHz, LORA_TCXO, rp.cr, rp.dutyLimit);
   digitalWrite(LORA_CS, LOW);
   digitalWrite(LORA2_CS, HIGH);
   #endif
@@ -442,6 +472,7 @@ void setupLoRa()
     #ifndef DUAL_LORA
     Serial.printf(" --> Layer1 init succeeded\r\n");
     LL2 = new LL2Class(Layer1_1);
+    LL2->setDutyCycle(rp.dutyLimit);
     #else
     if(Layer1_2->init()){
       Serial.printf(" --> Dual Layer1 init succeeded\r\n");

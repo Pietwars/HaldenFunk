@@ -15,13 +15,13 @@ declare -A NAME=([t3s3-sx1262]="LILYGO T3-S3 (SX1262)" [t3-v161-sx1276]="LILYGO 
 declare -A ZIP=([t3s3-sx1262]=t3s3 [t3-v161-sx1276]=t3-v161 [heltec-v2-sx1276]=heltec-v2)
 for env in t3s3-sx1262 t3-v161-sx1276 heltec-v2-sx1276; do
   (cd $FW && pio run -e $env && pio run -e $env -t buildfs) >/dev/null
-  B=$FW/.pio/build/$env; D=$OUT/DisAHRsterRadio-${ZIP[$env]}; rm -rf "$D"; mkdir -p "$D/teile"
+  B=$FW/.pio/build/$env; D=$OUT/HaldenFunk-${ZIP[$env]}; rm -rf "$D"; mkdir -p "$D/teile"
   cp $B/bootloader.bin $B/partitions.bin $B/firmware.bin $B/littlefs.bin "$D/teile/"; cp "$BOOTAPP0" "$D/teile/boot_app0.bin"
-  $ESPTOOL --chip ${CHIP[$env]} merge-bin -o "$D/DisAHRsterRadio-${ZIP[$env]}-factory.bin" --flash-mode keep --flash-freq keep --flash-size 4MB \
+  $ESPTOOL --chip ${CHIP[$env]} merge-bin -o "$D/HaldenFunk-${ZIP[$env]}-factory.bin" --flash-mode keep --flash-freq keep --flash-size 4MB \
     ${BOOT[$env]} $B/bootloader.bin 0x8000 $B/partitions.bin 0xe000 "$BOOTAPP0" 0x10000 $B/firmware.bin 0x200000 $B/littlefs.bin >/dev/null
   sed -e "s/@BOARD@/${NAME[$env]}/g" -e "s/@ZIP@/${ZIP[$env]}/g" -e "s/@CHIP@/${CHIP[$env]}/g" -e "s/@BOOT@/${BOOT[$env]}/g" \
       -e "s/@VERSION@/$VERSION/g" -e "s/@COMMIT@/$COMMIT/g" "$ROOT/tools/ANLEITUNG.template.md" > "$D/ANLEITUNG.md"
-  (cd "$D" && sha256sum DisAHRsterRadio-${ZIP[$env]}-factory.bin teile/*.bin > SHA256SUMS)
-  rm -f "$OUT/DisAHRsterRadio-${ZIP[$env]}.zip"; (cd "$OUT" && python3 -m zipfile -c "DisAHRsterRadio-${ZIP[$env]}.zip" "DisAHRsterRadio-${ZIP[$env]}")
-  echo "$env -> $OUT/DisAHRsterRadio-${ZIP[$env]}.zip"
+  (cd "$D" && sha256sum HaldenFunk-${ZIP[$env]}-factory.bin teile/*.bin > SHA256SUMS)
+  rm -f "$OUT/HaldenFunk-${ZIP[$env]}.zip"; (cd "$OUT" && python3 -m zipfile -c "HaldenFunk-${ZIP[$env]}.zip" "HaldenFunk-${ZIP[$env]}")
+  echo "$env -> $OUT/HaldenFunk-${ZIP[$env]}.zip"
 done

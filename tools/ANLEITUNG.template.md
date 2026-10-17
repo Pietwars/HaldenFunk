@@ -1,6 +1,6 @@
-# DisAHRsterRadio für @BOARD@
+# HaldenFunk für @BOARD@
 
-Version @VERSION@ (Commit @COMMIT@) · Quelle: https://github.com/Pietwars/DisAHRsterRadio
+Version @VERSION@ (Commit @COMMIT@) · Quelle: https://github.com/Pietwars/HaldenFunk
 
 > ⚠️ Kein zertifiziertes Notrufsystem. In Lebensgefahr immer **112** wählen. Diese Firmware ist **noch nicht auf echter Hardware getestet**.
 
@@ -13,7 +13,7 @@ Version @VERSION@ (Commit @COMMIT@) · Quelle: https://github.com/Pietwars/DisAH
 1. Board per USB-Datenkabel an den Rechner (Chrome oder Edge am PC/Mac, nicht iPhone).
 2. https://espressif.github.io/esptool-js/ öffnen, Baudrate 921600 (bei Problemen 115200), **Connect** und den Port wählen.
    - T3-S3: Wird kein Port gefunden, **BOOT** gedrückt halten, kurz **RST** drücken, BOOT loslassen.
-3. Bei **Flash Address** `0x0` eintragen und `DisAHRsterRadio-@ZIP@-factory.bin` wählen.
+3. Bei **Flash Address** `0x0` eintragen und `HaldenFunk-@ZIP@-factory.bin` wählen.
 4. Optional zuerst **Erase Flash** (löscht alles, auch gespeicherte Aushänge und das WLAN-Passwort).
 5. **Program** und warten, bis „Leaving…“ erscheint. Dann **RST** drücken oder kurz vom Strom trennen.
 
@@ -26,7 +26,7 @@ Jedes Gerät erzeugt beim ersten Start ein **eigenes Zufallspasswort**. So komms
 1. In esptool-js auf **Disconnect**, dann unten im Bereich **Console** mit **115200** Baud verbinden (oder ein anderer serieller Monitor mit 115200).
 2. **RST** drücken. Es erscheint:
    ```
-   WLAN: DisAHRsterRadio-XXXXXX
+   WLAN: HaldenFunk-XXXXXX
    Passwort: xxxxxxxxxxxx
    Browser: http://192.168.4.1
    ```
@@ -46,7 +46,7 @@ Nur wenn sich Weboberfläche oder Karten geändert haben: zusätzlich `teile/lit
 
 | Datei | Adresse |
 |---|---|
-| `DisAHRsterRadio-@ZIP@-factory.bin` | 0x0 (komplett) |
+| `HaldenFunk-@ZIP@-factory.bin` | 0x0 (komplett) |
 | `teile/bootloader.bin` | @BOOT@ |
 | `teile/partitions.bin` | 0x8000 |
 | `teile/boot_app0.bin` | 0xe000 |

@@ -6,7 +6,7 @@
 #include "secrets.h"
 #endif
 
-#define DAR_VERSION "0.1.1-dev"
+#define DAR_VERSION "0.1.0-alpha"
 #define CLOCK_SPEED 240
 
 // EU868 Standard: 869.525 MHz (Teilband g3, 10 % Duty-Cycle), 125 kHz, SF9, 14 dBm

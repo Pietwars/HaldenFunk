@@ -1,63 +1,51 @@
-# DisAHRsterRadio
+# HaldenFunk
 
-**🔴 Live-Demo (simulierte Daten, kein Gerät nötig): https://pietwars.github.io/DisAHRsterRadio/**
+**Glück Auf – Mesh fürs Mansfelder Land**
 
-![DisAHRsterRadio Ahrtal](docs/images/disahrsterradio-header.jpg)
+**🔴 Live-Demo (simulierte Daten, kein Gerät nötig): https://pietwars.github.io/HaldenFunk/**
 
-**Version 0.1.1-dev** (Entwicklungsstand, kein Release) · disaster-radio/LoRaLayer2 + RadioLib 7 · Weboberfläche MeshAhrtal · 868 MHz · Firmware über [Actions](https://github.com/Pietwars/DisAHRsterRadio/actions) · **Flyer (A5):** [Druck-PDF mit QR-Codes](docs/flyer/DisAHRsterRadio-Flyer.pdf) · [Digital-PDF mit klickbaren Links](docs/flyer/DisAHRsterRadio-Flyer-digital.pdf)
+![HaldenFunk – Halden, Förderturm und Funkwellen](docs/images/haldenfunk-header.jpg)
 
-**Offline-Chat über LoRa-Mesh für das Ahrtal** – ein Gerät spannt ein eigenes WLAN auf, man verbindet sich mit dem Handy und schreibt im Browser. Die Nachrichten laufen per LoRa von Gerät zu Gerät weiter, ganz ohne Internet oder Mobilfunk.
+**Version 0.1.0-alpha** (Vorabversion) · [Release v0.1.0-alpha mit Firmware](https://github.com/Pietwars/HaldenFunk/releases/tag/v0.1.0-alpha) · disaster-radio/LoRaLayer2 + RadioLib 7 · 868 MHz · **Flyer (A5):** [Druck-PDF mit QR-Codes](docs/flyer/HaldenFunk-Flyer.pdf) · [Digital-PDF mit klickbaren Links](docs/flyer/HaldenFunk-Flyer-digital.pdf) · [Änderungen](CHANGELOG.md)
 
-Dieses Projekt ist ein modernisierter Fork von **[sudomesh/disaster-radio](https://github.com/sudomesh/disaster-radio)** mit der Ahrtal-Weboberfläche aus **[Pietwars/DisasterMesh](https://github.com/Pietwars/DisasterMesh)** – aber **ohne MeshCore**: Funk und Routing laufen über das ursprüngliche disaster-radio-Konzept (Layer1 + LoRaLayer2).
+**Offline-Chat über LoRa-Mesh für Sangerhausen, das Mansfelder Land, die Goldene Aue und den Harzrand.** Ein Gerät spannt ein eigenes WLAN auf, man verbindet sich mit dem Handy und schreibt im Browser. Die Nachrichten laufen per LoRa von Gerät zu Gerät weiter – ganz ohne Internet, Strom aus der Steckdose oder Mobilfunk. Ideale Standorte für Knoten: Halden, Fördertürme, Kirchtürme, Dächer am Harzrand.
 
-<!-- projektfamilie:start (in allen drei Repositorys identisch) -->
-### Projektfamilie DisAHRsterRadio
+HaldenFunk ist die **Regionalvariante von [Pietwars/DisAHRsterRadio](https://github.com/Pietwars/DisAHRsterRadio)** (ein modernisierter Fork von [sudomesh/disaster-radio](https://github.com/sudomesh/disaster-radio), **ohne MeshCore**). Technik und Funkprotokoll sind identisch – HaldenFunk-Geräte verstehen sich mit DisAHRsterRadio-Geräten auf gleicher Frequenz. Neu sind Name, Gestaltung, Ortsliste und Karten.
 
-| Repository | Inhalt | Version | Demo · Download · Flyer |
+> ⚠️ **Wichtig:** HaldenFunk ist **kein zertifiziertes Notrufsystem** und ersetzt keine Behörden-Kommunikation. In Lebensgefahr immer **112** wählen, wenn irgendwie möglich.
+
+## Projektfamilie
+
+| Repository | Inhalt | Version | Demo · Download |
 |---|---|---|---|
-| [Pietwars/DisasterMesh](https://github.com/Pietwars/DisasterMesh) | Original-Repo: MeshCore 1.18 mit der großen Weboberfläche MeshAhrtal, Karten, Werkzeuge, Doku | 0.9.0-alpha | [Live-Demo](https://pietwars.github.io/DisasterMesh/demo/) · [Projektseite](https://pietwars.github.io/DisasterMesh/) · Firmware über [Actions](https://github.com/Pietwars/DisasterMesh/actions) · Flyer [Druck](https://pietwars.github.io/DisasterMesh/flyer/DisasterMesh-Flyer.pdf) / [digital](https://pietwars.github.io/DisasterMesh/flyer/DisasterMesh-Flyer-digital.pdf) |
-| [Pietwars/DisAHRsterRadio-MeshCore](https://github.com/Pietwars/DisAHRsterRadio-MeshCore) | MeshCore 1.18 mit kompakter MeshAhrtal-Oberfläche per WLAN plus Bluetooth für die MeshCore-App, 105 Geräte | 0.9.0-alpha | [Live-Demo](https://pietwars.github.io/DisAHRsterRadio-MeshCore/) · [Release v0.9.0-alpha](https://github.com/Pietwars/DisAHRsterRadio-MeshCore/releases/tag/v0.9.0-alpha) · Flyer [Druck](https://pietwars.github.io/DisAHRsterRadio-MeshCore/flyer/DisAHRsterRadio-MeshCore-Flyer.pdf) / [digital](https://pietwars.github.io/DisAHRsterRadio-MeshCore/flyer/DisAHRsterRadio-MeshCore-Flyer-digital.pdf) |
-| [Pietwars/DisAHRsterRadio](https://github.com/Pietwars/DisAHRsterRadio) | Ohne MeshCore: modernisiertes disaster-radio (LoRaLayer2, RadioLib) mit kompakter MeshAhrtal-Oberfläche – nicht kompatibel zu MeshCore-Knoten | 0.1.1-dev | [Live-Demo](https://pietwars.github.io/DisAHRsterRadio/) · Firmware über [Actions](https://github.com/Pietwars/DisAHRsterRadio/actions) · Flyer [Druck](https://pietwars.github.io/DisAHRsterRadio/flyer/DisAHRsterRadio-Flyer.pdf) / [digital](https://pietwars.github.io/DisAHRsterRadio/flyer/DisAHRsterRadio-Flyer-digital.pdf) |
+| [Pietwars/DisasterMesh](https://github.com/Pietwars/DisasterMesh) | Original-Repo: MeshCore 1.18 mit großer Weboberfläche MeshAhrtal, Karten, Werkzeuge | 0.9.0-alpha | [Live-Demo](https://pietwars.github.io/DisasterMesh/demo/) · [Projektseite](https://pietwars.github.io/DisasterMesh/) |
+| [Pietwars/DisAHRsterRadio-MeshCore](https://github.com/Pietwars/DisAHRsterRadio-MeshCore) | MeshCore 1.18, kompakte Oberfläche per WLAN + Bluetooth für die MeshCore-App | 0.9.0-alpha | [Live-Demo](https://pietwars.github.io/DisAHRsterRadio-MeshCore/) · [Release](https://github.com/Pietwars/DisAHRsterRadio-MeshCore/releases/tag/v0.9.0-alpha) |
+| [Pietwars/DisAHRsterRadio](https://github.com/Pietwars/DisAHRsterRadio) | Ohne MeshCore: modernisiertes disaster-radio (LoRaLayer2, RadioLib) fürs Ahrtal | 0.1.1-dev | [Live-Demo](https://pietwars.github.io/DisAHRsterRadio/) |
+| **[Pietwars/HaldenFunk](https://github.com/Pietwars/HaldenFunk)** | Regionalvariante von DisAHRsterRadio für Sangerhausen / Mansfelder Land | 0.1.0-alpha | [Live-Demo](https://pietwars.github.io/HaldenFunk/) · [Release](https://github.com/Pietwars/HaldenFunk/releases/tag/v0.1.0-alpha) |
 
-**Namen:** **DisAHRsterRadio** = Projekt und Marke (auch WLAN-Name `DisAHRsterRadio-XXXXXX`) · **MeshAhrtal** = die Weboberfläche im Handy-Browser · **DisasterMesh** = das Original-Repository.
-Haupt-Boards: LILYGO T3-S3 V1.3, LILYGO T3 V1.6.1 (TTGO), Heltec WiFi LoRa 32 V2 – alle 868 MHz; Hardware-Abnahme steht aus (bisher lief nur LILYGO T3 V1.6.1 beim Nutzer). Druck-Flyer haben QR-Codes, digitale Flyer klickbare Links. Alle Demos sind simuliert.
-
-> ⚠️ Prototyp, kein zertifiziertes Notrufsystem. **Im Notfall immer 112.**
-<!-- projektfamilie:end -->
-
-> ⚠️ **Wichtig:** DisAHRsterRadio ist **kein zertifiziertes Notrufsystem** und ersetzt keine Behörden-Kommunikation. In Lebensgefahr immer **112** wählen, wenn irgendwie möglich.
+DisasterMesh und DisAHRsterRadio-MeshCore sprechen MeshCore und sind **nicht** funkkompatibel zu DisAHRsterRadio/HaldenFunk.
 
 ## Ehrlicher Stand (Oktober 2026)
 
 | Punkt | Stand |
 |---|---|
-| Firmware baut für alle 3 Boards | ✅ (lokal und per GitHub Actions) |
-| Auf echter Hardware getestet | ⚠️ teilweise: LILYGO T3 V1.6.1 lief beim Nutzer vollständig (OLED, WLAN, Weboberfläche, Chat, LoRa-Empfang); Heltec V2 zeigte ein Strom-/Brownout-Problem (WLAN-AP fehlte), WLAN-Fix enthalten, ungeprüft; T3-S3 ungetestet |
+| Firmware baut für alle 3 Boards | ✅ (lokal; Pakete im Release) |
+| Auf echter Hardware getestet | ❌ HaldenFunk selbst noch nicht; die gleiche Basis lief bei DisAHRsterRadio auf einem LILYGO T3 V1.6.1 |
 | Funkverbindung zwischen zwei Geräten | ❓ ungetestet |
-| Kompatibel mit altem disaster-radio-Funk (915 MHz/US) | ❌ nein, EU868-Standard |
-| Kompatibel mit MeshCore/DisasterMesh-Geräten | ❌ nein, anderes Funkprotokoll |
+| Kompatibel mit DisAHRsterRadio | ✅ gleiches Protokoll und gleiche Standardfrequenz |
+| Kompatibel mit MeshCore/Meshtastic | ❌ nein |
 
 ## Unterstützte Boards
 
-| PlatformIO-Env | Board | Funkchip |
-|---|---|---|
-| `t3s3-sx1262` | LILYGO T3-S3 (Hauptziel) | SX1262 (TCXO 1,8 V) |
-| `t3-v161-sx1276` | LILYGO T3 V1.6.1 | SX1276 |
-| `heltec-v2-sx1276` | Heltec WiFi LoRa 32 V2 | SX1276 |
+| PlatformIO-Env | Board | Funkchip | Paket im Release |
+|---|---|---|---|
+| `t3s3-sx1262` | LILYGO T3-S3 | SX1262 | `HaldenFunk-t3s3.zip` |
+| `t3-v161-sx1276` | LILYGO / TTGO T3 V1.6.1 | SX1276 | `HaldenFunk-t3-v161.zip` |
+| `heltec-v2-sx1276` | Heltec WiFi LoRa 32 V2 | SX1276 | `HaldenFunk-heltec-v2.zip` |
 
-Heltec V2 (WLAN-Fix): Brownout-Detektor früh aus, WLAN startet zuletzt (2 s nach LoRa/Display), WLAN-Sendeleistung 8,5 dBm (Variante `heltec-v2-sx1276-wifi11` mit 11 dBm), softAP auf Kanal 1 mit Prüfung und Neuversuch alle 5 s, LoRa-Sendepause während des WLAN-Starts, Startmarken `[BOOT …]` und alle 30 s WLAN-Name/Passwort seriell und auf dem OLED.
+Jedes ZIP enthält `factory.bin` (ab Adresse 0x0), die Einzelteile, `SHA256SUMS` und eine `ANLEITUNG.md` (Flashen im Browser mit esptool-js).
 
-## Was gegenüber disaster-radio modernisiert wurde
-
-- PlatformIO mit **pioarduino** (aktuelles Arduino-ESP32 3.3.x / ESP-IDF 5.5) statt altem Git-Stand der espressif32-Plattform
-- **RadioLib 7.x** statt sandeepmistry/arduino-LoRa bzw. uraltem RadioLib-Commit; eine gemeinsame `Layer1_RadioLib` für SX1262 und SX1276 (SX1262 jetzt mit BUSY-Pin, TCXO, DIO2-HF-Schalter)
-- **LoRaLayer2** (Routing von disaster-radio) liegt angepasst in `firmware/lib/LoRaLayer2` (Sende-/Empfangsleistung und SF zur Laufzeit, Konfigurationsausgabe auch für RadioLib)
-- **ESP32Async/ESPAsyncWebServer + AsyncTCP** (gepflegte Forks), **LittleFS** statt SPIFFS, AsyncSDServer entfernt (SD über ESPAsyncWebServer)
-- **EU868-Standard:** 869,525 MHz, 125 kHz, SF9, 14 dBm (Duty-Cycle-Begrenzung von LoRaLayer2 aktiv)
-- WLAN-Zugangspunkt **`DisAHRsterRadio-XXXXXX`** mit **geräteindividuellem Zufallspasswort** (einmal erzeugt, im NVS gespeichert, beim Start seriell ausgegeben)
-- BLE-UART von disaster-radio ist vorerst deaktiviert (Bluedroid-API passt nicht zu Arduino-ESP32 3.x auf dem S3; Build-Flag `HAS_BLE`)
-
-## Weboberfläche (MeshAhrtal)
+## Weboberfläche
 
 | Chat | Schnellmeldung | Brett |
 |---|---|---|
@@ -65,19 +53,22 @@ Heltec V2 (WLAN-Fix): Brownout-Detektor früh aus, WLAN startet zuletzt (2 s nac
 | **Karte** | **Standort** | **Gerät** |
 | <img src="docs/images/funktion-map.jpg" width="230" alt="Karte"> | <img src="docs/images/funktion-loc.jpg" width="230" alt="Standort"> | <img src="docs/images/funktion-info.jpg" width="230" alt="Gerät"> |
 
-(Aufnahmen der [Live-Demo](https://pietwars.github.io/DisAHRsterRadio/) in Handygröße, Stand 0.1.1-dev; alle Daten simuliert.)
+<img src="docs/images/funktion-desktop.jpg" width="700" alt="Desktop-Ansicht">
 
-- Chat an alle (disaster-radio-WebSocket `/ws`, Format `<ID 2 Byte>c|<Name> Text`, Zustellbestätigung ✓ = vom Gerät angenommen, *nicht* beim Empfänger)
-- Schnellmeldungen (Trinkwasser, Strom, Medikamente, Verletzt, Evakuierung, „Mir geht es gut“, Hilfe-Angebote)
-- Standort: GPS des Telefons (funktioniert im Browser oft nur über HTTPS) oder Auswahl aus der Ortsliste Ahrtal (Ahrweiler … Sinzig)
-- **Schwarzes Brett:** Aushänge (optional „wichtig/angeheftet“, Laufzeit 6 h – 7 Tage) werden auf jedem Gerät in LittleFS (`/board.txt`) gespeichert, per Funk als eigener Datagramm-Typ `b` verteilt, anhand einer zufälligen 8-stelligen ID entdoppelt und von jedem Gerät einmal weitergesendet (Mehrsprung). Alle ~5 min sendet jedes Gerät einen gespeicherten Aushang erneut, damit später eingeschaltete Geräte nachziehen. Max. 30 Aushänge pro Gerät; `GET /api/board`
-- **Offline-Karte:** fünf OSM-Pakete aus DisasterMesh (Ahrtal-Übersicht, Heimersheim mit Gebäuden, Dernau/Ahrweiler, Altenahr, Sinzig), kompakt und gzip-komprimiert (zusammen ca. 280 KB) im LittleFS; Anzeige mit Orten, Versorgungspunkten, eigener Position und Positionen aus Chat-/Brett-Nachrichten (Koordinaten im Text). Erzeugen mit `tools/make_map.py`. © OpenStreetMap-Mitwirkende, ODbL 1.0 (`web/static/map/ODbL-1.0.txt`)
-- Geräteinfo über `GET /api/info` (JSON)
-- Demo ohne Gerät: [Live-Demo](https://pietwars.github.io/DisAHRsterRadio/) oder `web/static/index.html?demo=1` lokal öffnen
+(Aufnahmen der [Live-Demo](https://pietwars.github.io/HaldenFunk/), Stand 0.1.0-alpha; alle Daten simuliert.)
 
-Die MeshCore-spezifischen Funktionen aus DisasterMesh (Kanäle, Direktnachrichten, Karten-Download/-Import, eigene POIs, Admin) sind **nicht** übernommen.
+- **Gestaltung:** Kupfer und Anthrazit, Spitzkegelhalden, Förderturm als Mesh-Knoten, Funkwellen. Das Hintergrundbild ist eine eigene, mit Python/PIL erzeugte Grafik (`tools/make_bg.py`), keine Fotos
+- **Chat** an alle in Funkreichweite, **Schnellmeldungen** (Trinkwasser, Strom, Medikamente, Verletzt, Evakuierung, „Mir geht es gut“, Angebote)
+- **Schwarzes Brett** mit Weitergabe über mehrere Geräte (LittleFS, max. 30 Aushänge, Ablaufzeit 6 h – 7 Tage)
+- **Standort:** GPS des Telefons oder Ortsliste – Sangerhausen, Hohe Linde, Wallhausen, Kyffhäuser-Denkmal, Kelbra, Roßla, Allstedt, Lutherstadt Eisleben, Mansfeld, Hettstedt, Wippra, Stolberg (Harzrand)
+- **Offline-Karten** (zusammen ca. 800 KB gzip im LittleFS): Mansfelder Land · Goldene Aue (Übersicht), Sangerhausen, Lutherstadt Eisleben, Mansfeld · Hettstedt, Kelbra · Roßla · Kyffhäuser. Halden (braun) und Schächte (kupfer) werden hervorgehoben. Erzeugt mit `tools/make_map_osm.py` aus OpenStreetMap, Datenstand 17.10.2026
+- Geräteinfo über `GET /api/info`, Demo lokal mit `web/static/index.html?demo=1`
 
 ## Erste Schritte
+
+**Am einfachsten:** passendes ZIP aus dem [Release](https://github.com/Pietwars/HaldenFunk/releases/tag/v0.1.0-alpha) laden und nach `ANLEITUNG.md` flashen.
+
+Selbst bauen:
 
 ```bash
 pip install platformio
@@ -87,27 +78,21 @@ pio run -e t3s3-sx1262 -t uploadfs    # Weboberfläche (LittleFS)
 pio device monitor                     # zeigt WLAN-Name und Passwort
 ```
 
-Dann mit dem WLAN `DisAHRsterRadio-XXXXXX` verbinden und `http://192.168.4.1` öffnen (oder `http://disahrster.local`). Seriell/Telnet (Port 23) gibt es weiterhin die disaster-radio-Konsole.
+Dann mit dem WLAN **`HaldenFunk-XXXXXX`** verbinden. Das **Passwort ist pro Gerät zufällig** (einmal erzeugt, im NVS gespeichert) und wird seriell sowie auf dem OLED angezeigt. Im Browser `http://192.168.4.1` öffnen (oder `http://haldenfunk.local`).
 
-## Fertige Flash-Pakete
+Standard-Funkparameter (EU868): 869,525 MHz, 125 kHz, SF9, 14 dBm.
 
-`tools/package.sh` baut je Board ein ZIP mit `factory.bin` (ab 0x0), Einzelteilen, `SHA256SUMS` und `ANLEITUNG.md` (esptool-js, Update nur `firmware.bin` an 0x10000).
+## Bekannte Grenzen
 
-## Bekannte Grenzen / offene Arbeit
+- Nicht auf Hardware getestet; Pinbelegungen von DisAHRsterRadio übernommen
+- Chat nur Einzelsprung (LoRaLayer2 leitet Broadcasts nicht weiter); nur das Brett wird über mehrere Geräte weitergereicht
+- Keine Verschlüsselung/Signatur – alle auf der Frequenz können mitlesen und Namen fälschen
+- Karten ohne Navigation und ohne Gebäude in der Übersicht
+- Weitere Grenzen wie bei [DisAHRsterRadio](https://github.com/Pietwars/DisAHRsterRadio#bekannte-grenzen--offene-arbeit)
 
-- Hardwaretest auf allen drei Boards (Funk zwischen zwei Geräten, Reichweite, Stromaufnahme, Heltec-Brownout)
-- Pinbelegung T3-S3 und T3 V1.6.1 nach Datenblatt/LILYGO-Beispielen gesetzt, nicht gemessen
-- Keine Verschlüsselung/Signatur der Nachrichten (alle mit gleicher Frequenz können mitlesen und Namen fälschen)
-- Nachrichtenlänge max. ca. 220 Byte; kein Direktchat, keine Kanäle
-- **Chat ist nur Einzelsprung:** LoRaLayer2 leitet Broadcasts nicht weiter (upstream-Verhalten). Nur das Schwarze Brett wird über mehrere Geräte weitergereicht
-- Brett: Ablaufzeit läuft nur, solange das Gerät an ist (keine Uhr); Aushänge können nicht gelöscht werden; jeder kann „wichtig“ setzen; `littlefs.bin` neu flashen löscht die Aushänge
-- Karte: keine Navigation, keine Kacheln, keine Gebäude außer Heimersheim; Datenstand 16.10.2026
-- Einstellung `loraFrq` ist ganzzahlig (869 = 869,525 MHz)
-- OLED-, GPS-, SD- und History-Code von disaster-radio übernommen, ungetestet
+## Lizenz, Quellen und Danksagung
 
-## Lizenz und Danksagung
-
-- Grundlage: [sudomesh/disaster-radio](https://github.com/sudomesh/disaster-radio) und [sudomesh/LoRaLayer2](https://github.com/sudomesh/LoRaLayer2) – vielen Dank an Sudo Mesh und alle Beteiligten. Git-Historie von disaster-radio ist erhalten, Original-README: [README.upstream.md](README.upstream.md).
-- `firmware/`: GPLv3 und AGPLv3 (dual, wie upstream) – siehe `LICENSE-GPL-3.0.txt`, `LICENSE-AGPL-3.0.txt`
-- `web/`: AGPLv3 (wie upstream). Die neue Ahrtal-Oberfläche stammt vom Autor aus DisasterMesh (dort MIT) und wird hier unter AGPLv3 veröffentlicht – MIT ist damit kompatibel.
-- Kopfbild: aus [Pietwars/DisasterMesh](https://github.com/Pietwars/DisasterMesh).
+- Grundlage: [sudomesh/disaster-radio](https://github.com/sudomesh/disaster-radio) und [sudomesh/LoRaLayer2](https://github.com/sudomesh/LoRaLayer2) – vielen Dank an Sudo Mesh. Git-Historie bleibt erhalten, Original-README: [README.upstream.md](README.upstream.md)
+- `firmware/`: GPLv3 und AGPLv3 (dual, wie upstream); `web/`: AGPLv3
+- **Kartendaten:** © OpenStreetMap-Mitwirkende, [ODbL 1.0](web/static/map/ODbL-1.0.txt)
+- **Bilder:** Hintergrund, Kopfbild und Icon sind eigene, programmatisch erzeugte Grafiken (`tools/make_bg.py`). Es werden keine Fotos von Wikimedia Commons oder anderen Quellen verwendet

@@ -48,9 +48,9 @@
 #include "DisasterHistory.h"
 #include "DisasterMiddleware.h"
 
-#define MDNS_NAME_PREFIX "disahrster"
-#define HOST_NAME "disahrsterradio"
-#define WIFI_AP_SSID_PREFIX "DisAHRsterRadio-"
+#define MDNS_NAME_PREFIX "haldenfunk"
+#define HOST_NAME "haldenfunk"
+#define WIFI_AP_SSID_PREFIX "HaldenFunk-"
 
 #define INDEX_FILE "index.html"
 
@@ -286,7 +286,7 @@ void setupHTTPSever()
   http_server.on("/api/info", HTTP_GET, [](AsyncWebServerRequest *request) {
     char json[384];
     snprintf(json, sizeof(json),
-             "{\"name\":\"DisAHRsterRadio\",\"version\":\"%s\",\"board\":\"%s\",\"node\":\"%s\",\"ssid\":\"%s\","
+             "{\"name\":\"HaldenFunk\",\"version\":\"%s\",\"board\":\"%s\",\"node\":\"%s\",\"ssid\":\"%s\","
              "\"lora\":%s,\"freq\":%.3f,\"sf\":%d,\"txPower\":%d,\"routes\":%d,\"clients\":%d,\"sd\":%s,\"uptime\":%lu}",
              DAR_VERSION, BOARD_NAME, nodeAddress, ssid, loraInitialized ? "true" : "false", loraFreqMHz(), spreadingFactor,
              txPower, routes, clients, sdInitialized ? "true" : "false", (unsigned long)(millis() / 1000));
@@ -349,11 +349,11 @@ public:
     Serial.printf("WelcomeMessage username: >%s<\n", username.c_str());
     if (username.isEmpty())
     {
-      msgLen = sprintf(data, "00c|Willkommen bei DisAHRsterRadio ");
+      msgLen = sprintf(data, "00c|Glueck Auf! Willkommen bei HaldenFunk ");
     }
     else
     {
-      msgLen = snprintf(data, 127, "00c|Willkommen bei DisAHRsterRadio >%s<", username.c_str());
+      msgLen = snprintf(data, 127, "00c|Glueck Auf! Willkommen bei HaldenFunk >%s<", username.c_str());
     }
 
     struct Datagram datagram1 = buildDatagram(BROADCAST, 'i', (uint8_t *)data, msgLen);
@@ -617,7 +617,7 @@ void setup()
   setCpuFrequencyMhz(CLOCK_SPEED); //Set CPU clock in config.h
   getCpuFrequencyMhz(); //Get CPU clock
 
-  Serial.printf("\nDisAHRsterRadio %s (%s) - basiert auf sudomesh/disaster-radio\n", DAR_VERSION, BOARD_NAME);
+  Serial.printf("\nHaldenFunk %s (%s) - basiert auf sudomesh/disaster-radio\n", DAR_VERSION, BOARD_NAME);
   delay(STARTUP_STAGGER_MS); // gestaffelter Start: Spannung stabilisieren lassen
 #ifndef WIFI_LATE
   setupNetwork();

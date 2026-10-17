@@ -6,7 +6,7 @@ OUT=${1:-$ROOT/dist}
 FW=$ROOT/firmware
 ESPTOOL=${ESPTOOL:-"python3 -m esptool"}
 BOOTAPP0=$(find ~/.platformio/packages/framework-arduinoespressif32 -name boot_app0.bin | head -1)
-VERSION=$(grep -o 'DAR_VERSION "[^"]*"' $FW/config.h | cut -d'"' -f2)
+VERSION=$(python3 "$ROOT/tools/version.py" --get)   # zentrale Versionsquelle: Datei VERSION
 COMMIT=$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || echo unbekannt)
 mkdir -p "$OUT"
 declare -A CHIP=([t3s3-sx1262]=esp32s3 [t3-v161-sx1276]=esp32 [heltec-v2-sx1276]=esp32)

@@ -14,7 +14,7 @@ declare -A BOOT=([t3s3-sx1262]=0x0 [t3-v161-sx1276]=0x1000 [heltec-v2-sx1276]=0x
 declare -A NAME=([t3s3-sx1262]="LILYGO T3-S3 (SX1262)" [t3-v161-sx1276]="LILYGO T3 V1.6.1 (SX1276)" [heltec-v2-sx1276]="Heltec WiFi LoRa 32 V2 (SX1276)")
 declare -A ZIP=([t3s3-sx1262]=t3s3 [t3-v161-sx1276]=t3-v161 [heltec-v2-sx1276]=heltec-v2)
 for env in t3s3-sx1262 t3-v161-sx1276 heltec-v2-sx1276; do
-  (cd $FW && pio run -e $env && pio run -e $env -t buildfs) >/dev/null
+  (cd $FW && pio run -e $env -t buildfs && pio run -e $env) >/dev/null   # Reihenfolge wichtig: buildfs leert sonst das Build-Verzeichnis
   B=$FW/.pio/build/$env; D=$OUT/HaldenFunk-${ZIP[$env]}; rm -rf "$D"; mkdir -p "$D/teile"
   cp $B/bootloader.bin $B/partitions.bin $B/firmware.bin $B/littlefs.bin "$D/teile/"; cp "$BOOTAPP0" "$D/teile/boot_app0.bin"
   $ESPTOOL --chip ${CHIP[$env]} merge-bin -o "$D/HaldenFunk-${ZIP[$env]}-factory.bin" --flash-mode keep --flash-freq keep --flash-size 4MB \

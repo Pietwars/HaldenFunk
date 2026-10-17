@@ -66,7 +66,6 @@ SPIClass sd_card(VSPI_OR_FSPI);
 #endif
 
 
-AsyncServer tcp_server(23);
 AsyncWebServer http_server(80);
 AsyncWebSocket ws_server("/ws");
 
@@ -110,7 +109,6 @@ int routes = 0;
 
 char nodeAddress[ADDR_LENGTH*2 + 1] = {'\0'};
 char ssid[100] = {'\0'};
-String apPassword;
 bool apOk = false;
 uint32_t lastApRetry = 0, lastApPrint = 0;
 
@@ -122,7 +120,7 @@ void bootMark(const char *step)
 
 bool startSoftAP()
 {
-  bool ok = WiFi.softAP(ssid, apPassword.c_str(), 1, false, 4);
+  bool ok = WiFi.softAP(ssid, nullptr, 1, false, 4);
 #ifdef WIFI_TX_POWER
   WiFi.setTxPower(WIFI_TX_POWER);
 #endif
@@ -175,20 +173,9 @@ void setupWiFi()
     // format full SSID with MAC address suffix
     snprintf(ssid, sizeof(ssid), "%s%02X%02X%02X", WIFI_AP_SSID_PREFIX, mac[3], mac[4], mac[5]);
 
-    // geraeteindividuelles Zufallspasswort (einmal erzeugt, im NVS gespeichert)
+    // Open AP, also after upgrading a device with saved credentials.
     Preferences wp;
-    wp.begin("dar-wifi", false);
-    apPassword = wp.getString("ap-pass", "");
-    if (apPassword.length() < 12)
-    {
-      uint8_t rnd[6];
-      esp_fill_random(rnd, sizeof(rnd));
-      char buf[13];
-      for (int i = 0; i < 6; i++) sprintf(buf + 2 * i, "%02x", rnd[i]);
-      apPassword = String(buf);
-      wp.putString("ap-pass", apPassword);
-    }
-    wp.end();
+    if (wp.begin("dar-wifi", false)) { wp.remove("ap-pass"); wp.end(); }
 
     // start the AP
     Layer1Class::holdTx(8000); // waehrend WLAN-Start nicht per LoRa senden (Stromspitzen)
@@ -203,8 +190,8 @@ void setupWiFi()
 
     ip = WiFi.localIP();
     ip = WiFi.softAPIP();
-    Serial.printf("\n==============================\nWLAN: %s\nPasswort: %s\nBrowser: http://%s\n==============================\n",
-                  ssid, apPassword.c_str(), ip.toString().c_str());
+    Serial.printf("\n==============================\nWLAN: %s\nOffenes WLAN - kein Passwort\nBrowser: http://%s\n==============================\n",
+                  ssid, ip.toString().c_str());
   }
 }
 
@@ -414,18 +401,6 @@ void setupSerial()
       ->connect(new StreamClient(&Serial));
 }
 
-void setupTelnet()
-{
-  Serial.println("* Initializing telnet server...");
-
-  TCPClient::startServer(&tcp_server, [](TCPClient *tcp_client) {
-    radio->connect(new WelcomeMessage())
-        ->connect(new HistoryReplay(history))
-        ->connect(new Console())
-        ->connect(tcp_client);
-  });
-}
-
 void setupWebSocket()
 {
   Serial.println("* Initializing WebSocket server...");
@@ -621,7 +596,7 @@ void setupBLE(void) { Serial.println("* BLE in diesem Build deaktiviert"); }
 
 void setupNetwork()
 {
-  if (useBLE) { setupBLE(); return; }
+  // Always keep the open WLAN available, even with an old saved BLE-only setting.
   bootMark("WLAN");
   setupWiFi();
   delay(STARTUP_STAGGER_MS);
@@ -630,8 +605,11 @@ void setupNetwork()
   bootMark("HTTP");
   setupHTTPSever();
   bootMark("Telnet/WebSocket");
-  setupTelnet();
+  // No network console on an open AP. Operator configuration stays on USB.
   setupWebSocket();
+#ifdef HAS_BLE
+  setupBLE(); // optional combined build; never replaces WLAN
+#endif
 }
 
 void setup()
@@ -705,7 +683,7 @@ void loop()
                   (unsigned)ESP.getMaxAllocHeap(), freeHeap < HEAP_WARN_BYTES ? " | WARNUNG: wenig freier Speicher" : "");
   }
   // WLAN-AP pruefen/neu starten und Zugangsdaten regelmaessig ausgeben
-  if (!useBLE && ssid[0] && WiFi.getMode() & WIFI_AP)
+  if (ssid[0] && WiFi.getMode() & WIFI_AP)
   {
     if (!apOk && millis() - lastApRetry > 5000)
     {
@@ -716,8 +694,8 @@ void loop()
     if (millis() - lastApPrint > 30000)
     {
       lastApPrint = millis();
-      Serial.printf("[WLAN] %s | SSID: %s | Passwort: %s | http://%s | Clients: %d\n", apOk ? "AP aktiv" : "AP FEHLER", ssid,
-                    apPassword.c_str(), WiFi.softAPIP().toString().c_str(), WiFi.softAPgetStationNum());
+      Serial.printf("[WLAN] %s | SSID: %s | offen, ohne Passwort | http://%s | Clients: %d\n", apOk ? "AP aktiv" : "AP FEHLER", ssid,
+                    WiFi.softAPIP().toString().c_str(), WiFi.softAPgetStationNum());
 #ifdef HAS_OLED
       if (displayInitialized && clients == 0)
       {
@@ -728,7 +706,7 @@ void loop()
         display.setTextAlignment(TEXT_ALIGN_LEFT);
         display.drawString(0, 16, apOk ? "WLAN:" : "WLAN FEHLER:");
         display.drawString(0, 28, ssid);
-        display.drawString(0, 40, String("PW: ") + apPassword);
+        display.drawString(0, 40, String("WLAN offen / ohne Passwort"));
         display.drawString(0, 52, WiFi.softAPIP().toString());
         display.display();
       }
@@ -737,8 +715,9 @@ void loop()
   }
   // reconnect only in WiFi client mode 
 #ifdef WIFI_SSID
-  if (!useBLE) {
+  {
     checkWiFi();
   }
 #endif
 }
+

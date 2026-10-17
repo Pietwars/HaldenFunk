@@ -1,5 +1,14 @@
 # Changelog – HaldenFunk
 
+## Unveröffentlicht – offener Zugang
+
+- Offenes WLAN ohne Passwort, auch bei bestehenden Installationen.
+- MeshCore-Companion: PIN-freies BLE, öffentliche Befehle von Betreiberbefehlen getrennt.
+- Verkürzte Companion-Steuerbefehle und Pfadlängen vor Zugriff prüfen.
+- LoRaLayer2: Telnet-Konsole entfernt, kombinierte BLE-UART-Testprofile ergänzt.
+- Zugangsanleitung und Tests ergänzt; Hardwareabnahme steht aus.
+
+
 ## Unveröffentlicht · 17.10.2026
 
 - **Gemeinsamer Kern:** HaldenFunk = DisAHRsterRadio (`region/CORE`, aktuell 0.1.1-alpha) + `region/overlay.patch`; regionale Dateien in `region/own.txt`. `tools/core_sync.py` (`--check`, `--update`, `--make-patch`), CI-Schritt „Kern-Abgleich“, Doku `docs/KERN_UND_REGION.md`. Dabei aus dem Kern übernommen: Kartenprüfung `tests/maps.test.py` und der Workflow `build.yml`.
@@ -34,3 +43,4 @@ Erste Version der Regionalvariante von [DisAHRsterRadio](https://github.com/Piet
 - Firmware-Pakete für LILYGO T3-S3 (SX1262), LILYGO/TTGO T3 V1.6.1 (SX1276) und Heltec WiFi LoRa 32 V2 (SX1276)
 
 Funktechnische Basis unverändert gegenüber DisAHRsterRadio 0.1.1-dev (disaster-radio/LoRaLayer2, RadioLib 7, pioarduino, LittleFS). Nicht auf echter Hardware getestet.
+

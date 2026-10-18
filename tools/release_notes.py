@@ -8,7 +8,7 @@ log = (ROOT / 'CHANGELOG.md').read_text(encoding='utf-8')
 m = re.search(r'^## [^\n]*?v?' + re.escape(version) + r'\b[^\n]*\n(.*?)(?=^## |\Z)', log, re.S | re.M)
 body = m.group(1).strip() if m else '(Kein eigener CHANGELOG-Abschnitt für diese Version gefunden.)'
 rows = '\n'.join(f'| {n} | `{prefix}-{version}-{b}.zip` |' for b, n in (x.split('=', 1) for x in boards))
-print(f"""> ⚠️ **Kein zertifiziertes Notrufsystem.** In Lebensgefahr immer **112** wählen. Vorabversion, auf echter Hardware **nicht abgenommen**.
+print(f"""> ⚠️ **Kein zertifiziertes Notrufsystem.** In Lebensgefahr immer **112** wählen. {'Vorabversion, ' if '-' in version else ''}Diese Firmware ist auf echter Hardware **nicht abgenommen**.
 
 ## Änderungen
 {body}

@@ -1,6 +1,14 @@
 # Changelog – HaldenFunk
 
-## Unveröffentlicht – offener Zugang
+## 0.9.1 · 18.10.2026 · Release
+
+Versionsangleich der Projektfamilie auf 0.9.1 (von 0.1.1-alpha). Weboberfläche und alle Funktionen von HaldenFunk **unverändert**; enthält die bisher unveröffentlichten Punkte unten (offener Zugang, Funkprofile im Kern).
+
+- Release vorerst nur mit dem Paket für **Heltec WiFi LoRa 32 V2**; T3-S3 und T3 V1.6.1 bleiben im Code und im CI (HaldenFunk unterstützt den T-Deck Plus nicht).
+- Kern auf DisAHRsterRadio 0.9.1 (`tools/core_sync.py`), README, Projektfamilie und README-Bilder auf 0.9.1.
+- Auf echter Hardware ist HaldenFunk 0.9.1 nicht abgenommen.
+
+### Offener Zugang (seit 0.1.1-alpha)
 
 - **Offenes WLAN:** `HaldenFunk-XXXXXX` ohne Zugangsdaten (höchstens 4 Handys), ein früher gespeicherter AP-Schlüssel wird beim Start aus dem NVS gelöscht; seriell/OLED zeigen „offen“. WLAN bleibt auch bei früher gespeicherter BLE-only-Einstellung aktiv.
 - Telnet-Konsole entfernt, Betreiberkonfiguration nur über USB.

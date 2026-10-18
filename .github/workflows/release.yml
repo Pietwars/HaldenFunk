@@ -27,7 +27,8 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        env: [t3s3-sx1262, t3-v161-sx1276, heltec-v2-sx1276]
+        # 0.9.1: Release vorerst nur Heltec V2 (T-Deck Plus nicht unterstützt); übrige Boards bleiben im Code und CI
+        env: [heltec-v2-sx1276]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -62,13 +63,13 @@ jobs:
       - name: Pakete prüfen (Vollständigkeit, Prüfsummen, Version)
         run: |
           V=$(python3 tools/version.py --get)
-          python3 tools/verify_release.py dist HaldenFunk "$V" littlefs.bin t3s3 t3-v161 heltec-v2
+          python3 tools/verify_release.py dist HaldenFunk "$V" littlefs.bin heltec-v2
           (cd dist && sha256sum *.zip > SHA256SUMS-HaldenFunk-$V.txt)
       - name: Release-Text erzeugen
         run: |
           python3 tools/release_notes.py "$(python3 tools/version.py --get)" "${{ github.repository }}" HaldenFunk \
-            "t3s3=LILYGO T3-S3 V1.3 (SX1262)" "t3-v161=LILYGO T3 V1.6.1 (SX1276)" "heltec-v2=Heltec WiFi LoRa 32 V2 (SX1276)" | tee notes.md
-      - name: Vorabversion veröffentlichen
+            "heltec-v2=Heltec WiFi LoRa 32 V2 (SX1276)" | tee notes.md
+      - name: Release veröffentlichen
         if: env.TAG != ''
         env:
           GH_TOKEN: ${{ github.token }}
@@ -78,6 +79,7 @@ jobs:
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" $ASSETS --clobber
           else
-            gh release create "$TAG" --prerelease --verify-tag --title "HaldenFunk $TAG (Vorabversion)" --notes-file notes.md $ASSETS
+            case "$TAG" in *-*) gh release create "$TAG" --prerelease --verify-tag --title "HaldenFunk $TAG (Vorabversion)" --notes-file notes.md $ASSETS;;
+              *) gh release create "$TAG" --verify-tag --title "HaldenFunk $TAG" --notes-file notes.md $ASSETS;; esac
           fi
           gh release view "$TAG" --json assets --jq '.assets[].name'

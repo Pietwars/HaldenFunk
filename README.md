@@ -9,7 +9,7 @@
 
 ![HaldenFunk – Halden, Förderturm und Funkwellen](docs/images/haldenfunk-header.jpg)
 
-**Version 0.1.1-alpha** (Vorabversion) · [Release v0.1.1-alpha mit Firmware](https://github.com/Pietwars/HaldenFunk/releases/tag/v0.1.1-alpha) · disaster-radio/LoRaLayer2 + RadioLib 7 · 868 MHz · **Flyer (A5):** [Druck-PDF mit QR-Codes](docs/flyer/HaldenFunk-Flyer.pdf) · [Digital-PDF mit klickbaren Links](docs/flyer/HaldenFunk-Flyer-digital.pdf) · [Änderungen](CHANGELOG.md)
+**Version 0.9.1** · [Release v0.9.1 mit Firmware für Heltec V2](https://github.com/Pietwars/HaldenFunk/releases/tag/v0.9.1) · disaster-radio/LoRaLayer2 + RadioLib 7 · 868 MHz · **Flyer (A5):** [Druck-PDF mit QR-Codes](docs/flyer/HaldenFunk-Flyer.pdf) · [Digital-PDF mit klickbaren Links](docs/flyer/HaldenFunk-Flyer-digital.pdf) · [Änderungen](CHANGELOG.md)
 
 **Offline-Chat über LoRa-Mesh für Sangerhausen, das Mansfelder Land, die Goldene Aue und den Harzrand.** Ein Gerät spannt ein eigenes WLAN auf, man verbindet sich mit dem Handy und schreibt im Browser. Die Nachrichten laufen per LoRa von Gerät zu Gerät weiter – ganz ohne Internet, Strom aus der Steckdose oder Mobilfunk. Ideale Standorte für Knoten: Halden, Fördertürme, Kirchtürme, Dächer am Harzrand.
 
@@ -22,17 +22,17 @@ HaldenFunk ist die **Regionalvariante von [Pietwars/DisAHRsterRadio](https://git
 
 | Repository | Inhalt | Funk | Version | Demo · Download · Flyer |
 |---|---|---|---|---|
-| [Pietwars/DisasterMesh](https://github.com/Pietwars/DisasterMesh) | Original-Repo: MeshCore 1.18 mit der großen Weboberfläche MeshAhrtal, Karten, Werkzeuge, Doku (Ahrtal) | MeshCore | 0.9.0-alpha | [Live-Demo](https://pietwars.github.io/DisasterMesh/demo/) · [Release v0.9.0-alpha](https://github.com/Pietwars/DisasterMesh/releases/tag/v0.9.0-alpha) · Flyer [Druck](https://pietwars.github.io/DisasterMesh/flyer/DisasterMesh-Flyer.pdf) / [digital](https://pietwars.github.io/DisasterMesh/flyer/DisasterMesh-Flyer-digital.pdf) |
-| [Pietwars/DisAHRsterRadio-MeshCore](https://github.com/Pietwars/DisAHRsterRadio-MeshCore) | MeshCore 1.18 mit kompakter MeshAhrtal-Oberfläche per WLAN plus Bluetooth für die MeshCore-App, 105 Geräte (Ahrtal) | MeshCore | 0.9.0-alpha | [Live-Demo](https://pietwars.github.io/DisAHRsterRadio-MeshCore/) · [Release v0.9.0-alpha](https://github.com/Pietwars/DisAHRsterRadio-MeshCore/releases/tag/v0.9.0-alpha) · Flyer [Druck](https://pietwars.github.io/DisAHRsterRadio-MeshCore/flyer/DisAHRsterRadio-MeshCore-Flyer.pdf) / [digital](https://pietwars.github.io/DisAHRsterRadio-MeshCore/flyer/DisAHRsterRadio-MeshCore-Flyer-digital.pdf) |
-| [Pietwars/DisAHRsterRadio](https://github.com/Pietwars/DisAHRsterRadio) | Ohne MeshCore: modernisiertes disaster-radio (LoRaLayer2, RadioLib) mit kompakter MeshAhrtal-Oberfläche (Ahrtal) | LoRaLayer2 | 0.1.1-alpha | [Live-Demo](https://pietwars.github.io/DisAHRsterRadio/) · [Release v0.1.1-alpha](https://github.com/Pietwars/DisAHRsterRadio/releases/tag/v0.1.1-alpha) · Flyer [Druck](https://pietwars.github.io/DisAHRsterRadio/flyer/DisAHRsterRadio-Flyer.pdf) / [digital](https://pietwars.github.io/DisAHRsterRadio/flyer/DisAHRsterRadio-Flyer-digital.pdf) |
-| [Pietwars/HaldenFunk](https://github.com/Pietwars/HaldenFunk) | Regionalvariante von DisAHRsterRadio für Sangerhausen / Mansfelder Land, ohne MeshCore | LoRaLayer2 | 0.1.1-alpha | [Live-Demo](https://pietwars.github.io/HaldenFunk/) · [Release v0.1.1-alpha](https://github.com/Pietwars/HaldenFunk/releases/tag/v0.1.1-alpha) · Flyer [Druck](https://pietwars.github.io/HaldenFunk/flyer/HaldenFunk-Flyer.pdf) / [digital](https://pietwars.github.io/HaldenFunk/flyer/HaldenFunk-Flyer-digital.pdf) |
-| [Pietwars/HaldenFunk-MeshCore](https://github.com/Pietwars/HaldenFunk-MeshCore) | Regionalvariante von DisAHRsterRadio-MeshCore für das Mansfelder Land: MeshCore 1.18, WLAN + Bluetooth, Gerätematrix | MeshCore | 0.1.1-alpha | [Live-Demo](https://pietwars.github.io/HaldenFunk-MeshCore/) · [Release v0.1.0-alpha](https://github.com/Pietwars/HaldenFunk-MeshCore/releases/tag/v0.1.0-alpha) · Flyer [Druck](https://pietwars.github.io/HaldenFunk-MeshCore/flyer/HaldenFunk-MeshCore-Flyer.pdf) / [digital](https://pietwars.github.io/HaldenFunk-MeshCore/flyer/HaldenFunk-MeshCore-Flyer-digital.pdf) |
+| [Pietwars/DisasterMesh](https://github.com/Pietwars/DisasterMesh) | Original-Repo: MeshCore 1.18 mit der großen Weboberfläche MeshAhrtal, Karten, Werkzeuge, Doku (Ahrtal) | MeshCore | 0.9.1 | [Live-Demo](https://pietwars.github.io/DisasterMesh/demo/) · [Release v0.9.1](https://github.com/Pietwars/DisasterMesh/releases/tag/v0.9.1) · Flyer [Druck](https://pietwars.github.io/DisasterMesh/flyer/DisasterMesh-Flyer.pdf) / [digital](https://pietwars.github.io/DisasterMesh/flyer/DisasterMesh-Flyer-digital.pdf) |
+| [Pietwars/DisAHRsterRadio-MeshCore](https://github.com/Pietwars/DisAHRsterRadio-MeshCore) | MeshCore 1.18 mit kompakter MeshAhrtal-Oberfläche per WLAN plus Bluetooth für die MeshCore-App; Firmware für LILYGO T-Deck Plus und Heltec V2 (Ahrtal) | MeshCore | 0.9.1 | [Live-Demo](https://pietwars.github.io/DisAHRsterRadio-MeshCore/) · [Release v0.9.1](https://github.com/Pietwars/DisAHRsterRadio-MeshCore/releases/tag/v0.9.1) · Flyer [Druck](https://pietwars.github.io/DisAHRsterRadio-MeshCore/flyer/DisAHRsterRadio-MeshCore-Flyer.pdf) / [digital](https://pietwars.github.io/DisAHRsterRadio-MeshCore/flyer/DisAHRsterRadio-MeshCore-Flyer-digital.pdf) |
+| [Pietwars/DisAHRsterRadio](https://github.com/Pietwars/DisAHRsterRadio) | Ohne MeshCore: modernisiertes disaster-radio (LoRaLayer2, RadioLib) mit kompakter MeshAhrtal-Oberfläche (Ahrtal) | LoRaLayer2 | 0.9.1 | [Live-Demo](https://pietwars.github.io/DisAHRsterRadio/) · [Release v0.9.1](https://github.com/Pietwars/DisAHRsterRadio/releases/tag/v0.9.1) · Flyer [Druck](https://pietwars.github.io/DisAHRsterRadio/flyer/DisAHRsterRadio-Flyer.pdf) / [digital](https://pietwars.github.io/DisAHRsterRadio/flyer/DisAHRsterRadio-Flyer-digital.pdf) |
+| [Pietwars/HaldenFunk](https://github.com/Pietwars/HaldenFunk) | Regionalvariante von DisAHRsterRadio für Sangerhausen / Mansfelder Land, ohne MeshCore | LoRaLayer2 | 0.9.1 | [Live-Demo](https://pietwars.github.io/HaldenFunk/) · [Release v0.9.1](https://github.com/Pietwars/HaldenFunk/releases/tag/v0.9.1) · Flyer [Druck](https://pietwars.github.io/HaldenFunk/flyer/HaldenFunk-Flyer.pdf) / [digital](https://pietwars.github.io/HaldenFunk/flyer/HaldenFunk-Flyer-digital.pdf) |
+| [Pietwars/HaldenFunk-MeshCore](https://github.com/Pietwars/HaldenFunk-MeshCore) | Regionalvariante von DisAHRsterRadio-MeshCore für das Mansfelder Land: MeshCore 1.18, WLAN + Bluetooth, Gerätematrix | MeshCore | 0.9.1 | [Live-Demo](https://pietwars.github.io/HaldenFunk-MeshCore/) · [Release v0.9.1](https://github.com/Pietwars/HaldenFunk-MeshCore/releases/tag/v0.9.1) · Flyer [Druck](https://pietwars.github.io/HaldenFunk-MeshCore/flyer/HaldenFunk-MeshCore-Flyer.pdf) / [digital](https://pietwars.github.io/HaldenFunk-MeshCore/flyer/HaldenFunk-MeshCore-Flyer-digital.pdf) |
 
 Gleiche Spalte **Funk** = Geräte können miteinander funken (gleiches Funkprofil vorausgesetzt). MeshCore- und LoRaLayer2-Varianten verstehen sich **nicht**.
 
 **Namen:** **DisAHRsterRadio** = Projekt und Marke (WLAN `DisAHRsterRadio-XXXXXX`) · **MeshAhrtal** = die Weboberfläche im Handy-Browser · **DisasterMesh** = das Original-Repository · **HaldenFunk** = Regionalvariante fürs Mansfelder Land (WLAN `HaldenFunk-XXXXXX`).
 
-Haupt-Boards: LILYGO T3-S3 V1.3, LILYGO T3 V1.6.1 (TTGO), Heltec WiFi LoRa 32 V2 – alle 868 MHz; Hardware-Abnahme steht aus (bisher lief nur LILYGO T3 V1.6.1 mit DisAHRsterRadio beim Nutzer). Druck-Flyer haben QR-Codes, digitale Flyer klickbare Links. Alle Demos sind simuliert.
+Firmware 0.9.1 auf echter Hardware getestet: **LILYGO T-Deck Plus** und **Heltec WiFi LoRa 32 V2** (868 MHz) mit DisAHRsterRadio-MeshCore. Die Releases enthalten nur Firmware für diese beiden Boards (soweit das jeweilige Repository sie unterstützt); weitere Boards bleiben im Code, sind aber vorerst nicht im Release. Druck-Flyer haben QR-Codes, digitale Flyer klickbare Links. Alle Demos sind simuliert.
 
 > ⚠️ Prototyp, kein zertifiziertes Notrufsystem. **Im Notfall immer 112.**
 <!-- projektfamilie:end -->
@@ -51,12 +51,12 @@ Haupt-Boards: LILYGO T3-S3 V1.3, LILYGO T3 V1.6.1 (TTGO), Heltec WiFi LoRa 32 V2
 
 | PlatformIO-Env | Board | Funkchip | Paket im Release |
 |---|---|---|---|
-| `t3s3-sx1262` | LILYGO T3-S3 | SX1262 | `HaldenFunk-t3s3.zip` |
-| `t3-v161-sx1276` | LILYGO / TTGO T3 V1.6.1 | SX1276 | `HaldenFunk-t3-v161.zip` |
-| `heltec-v2-sx1276` | Heltec WiFi LoRa 32 V2 | SX1276 | `HaldenFunk-heltec-v2.zip` |
+| `t3s3-sx1262` | LILYGO T3-S3 | SX1262 | – (0.9.1 vorerst nicht im Release) |
+| `t3-v161-sx1276` | LILYGO / TTGO T3 V1.6.1 | SX1276 | – (0.9.1 vorerst nicht im Release) |
+| `heltec-v2-sx1276` | Heltec WiFi LoRa 32 V2 | SX1276 | `HaldenFunk-0.9.1-heltec-v2.zip` |
 | `heltec-v2-sx1276-wifi11` | Heltec WiFi LoRa 32 V2, WLAN mit 11 statt 8,5 dBm (falls das WLAN zu schwach ist) | SX1276 | – (nur CI-Artefakt / selbst bauen) |
 
-Jedes ZIP enthält `factory.bin` (ab Adresse 0x0), die Einzelteile, `SHA256SUMS` und eine `ANLEITUNG.md` (Flashen im Browser mit esptool-js). Paketnamen oben wie im Release v0.1.1-alpha; künftige Releases (Workflow „Release“ bei jedem Tag `v*`) heißen `HaldenFunk-<Version>-<Board>.zip`.
+Jedes ZIP enthält `factory.bin` (ab Adresse 0x0), die Einzelteile, `SHA256SUMS` und eine `ANLEITUNG.md` (Flashen im Browser mit esptool-js). Releases entstehen mit dem Workflow „Release“ bei jedem Tag `v*` und heißen `HaldenFunk-<Version>-<Board>.zip`. Ab 0.9.1 enthält das Release vorerst nur das Paket für den **Heltec V2**; T3-S3 und T3 V1.6.1 bleiben im Code und im CI. Den LILYGO T-Deck Plus unterstützt HaldenFunk nicht. Die `factory.bin` an 0x0 überschreibt alle Einstellungen.
 
 ## Funkprofile (868 MHz, Deutschland)
 
@@ -64,7 +64,7 @@ Alle Profile liegen vollständig im SRD-Teilband **869,4–869,65 MHz** (ETSI EN
 
 > ⚠️ **Alle Geräte eines Netzes müssen dasselbe Funkprofil nutzen**, sonst hören sie sich nicht. Auswahl im Reiter **Gerät → Funkprofil** (gespeichert im NVS, Neustart) oder seriell `/set preset N`.
 
-> ℹ️ Die Funkprofile sind auf `main`, aber **noch nicht im Release v0.1.1-alpha**. Die Release-Firmware 0.1.1-alpha funkt fest mit 869,525 MHz, 125 kHz, SF9, CR 4/5 (entspricht Profil 2 „Mittel“). Wer Release- und `main`-Geräte mischt, stellt die neueren Geräte auf „Mittel“.
+> ℹ️ Die Funkprofile sind ab Release 0.9.1 enthalten. Die ältere Release-Firmware 0.1.1-alpha funkt fest mit 869,525 MHz, 125 kHz, SF9, CR 4/5 (entspricht Profil 2 „Mittel“). Wer alte und neue Geräte mischt, stellt die neueren Geräte auf „Mittel“ oder aktualisiert alle.
 
 | Nr. | Profil | Frequenz | Bandbreite | SF | CR | Sendezeit je 100-Byte-Nachricht | max. Nachrichten/h (10 %) | Reichweite ↔ Tempo |
 |---|---|---|---|---|---|---|---|---|
@@ -88,7 +88,7 @@ Sendezeiten berechnet mit expliziter Kopfzeile, CRC, 8 Symbolen Präambel. Funke
 
 <img src="docs/images/funktion-desktop.jpg" width="700" alt="Desktop-Ansicht">
 
-(Aufnahmen der [Live-Demo](https://pietwars.github.io/HaldenFunk/), Stand 0.1.1-alpha; alle Daten simuliert.)
+(Aufnahmen der [Live-Demo](https://pietwars.github.io/HaldenFunk/), Stand 0.9.1; alle Daten simuliert.)
 
 - **Gestaltung:** Kupfer und Anthrazit, Spitzkegelhalden, Förderturm als Mesh-Knoten, Funkwellen. Das Hintergrundbild ist eine eigene, mit Python/PIL erzeugte Grafik (`tools/make_bg.py`), keine Fotos
 - **Chat** an alle in Funkreichweite, **Schnellmeldungen** (Trinkwasser, Strom, Medikamente, Verletzt, Evakuierung, „Mir geht es gut“, Angebote)
@@ -99,7 +99,7 @@ Sendezeiten berechnet mit expliziter Kopfzeile, CRC, 8 Symbolen Präambel. Funke
 
 ## Erste Schritte
 
-**Am einfachsten:** passendes ZIP aus dem [Release](https://github.com/Pietwars/HaldenFunk/releases/tag/v0.1.1-alpha) laden und nach `ANLEITUNG.md` flashen.
+**Am einfachsten:** passendes ZIP aus dem [Release](https://github.com/Pietwars/HaldenFunk/releases/tag/v0.9.1) laden und nach `ANLEITUNG.md` flashen.
 
 Selbst bauen:
 
@@ -113,7 +113,7 @@ pio device monitor                     # zeigt WLAN-Name und offenen Zugang
 
 Dann mit dem offenen WLAN `HaldenFunk-XXXXXX` verbinden und `http://192.168.4.1` öffnen. Betreiberkonsole nur über USB; Telnet ist deaktiviert.
 
-Standard-Funkprofil (aktueller Stand `main`): **EU Narrow** – 869,618 MHz, 62,5 kHz, SF8, CR 4/8, 14 dBm; weitere Profile siehe [Funkprofile](#funkprofile-868-mhz-deutschland). Release-Firmware 0.1.1-alpha: 869,525 MHz, 125 kHz, SF9, CR 4/5.
+Standard-Funkprofil (ab 0.9.1): **EU Narrow** – 869,618 MHz, 62,5 kHz, SF8, CR 4/8, 14 dBm; weitere Profile siehe [Funkprofile](#funkprofile-868-mhz-deutschland). Ältere Release-Firmware 0.1.1-alpha: 869,525 MHz, 125 kHz, SF9, CR 4/5.
 
 ## Gemeinsamer Kern mit DisAHRsterRadio
 

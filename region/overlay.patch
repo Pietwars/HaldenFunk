@@ -1,8 +1,8 @@
 diff --git a/.github/workflows/build.yml b/.github/workflows/build.yml
-index e203a09..ba4f036 100644
+index 4703f47..d4036d3 100644
 --- a/.github/workflows/build.yml
 +++ b/.github/workflows/build.yml
-@@ -55,3 +55,4 @@ jobs:
+@@ -58,3 +58,4 @@ jobs:
            name: firmware-${{ matrix.env }}
            if-no-files-found: error
            path: artefakt/*.bin

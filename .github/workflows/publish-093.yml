@@ -1,0 +1,36 @@
+name: Publish v0.9.3 after successful firmware CI
+on:
+  workflow_run:
+    workflows: ["Firmware-Build"]
+    types: [completed]
+permissions:
+  contents: write
+  actions: write
+jobs:
+  publish:
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Tag nur für den geprüften aktuellen v0.9.3-Commit anlegen und Release starten
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CHECKED_SHA: ${{ github.event.workflow_run.head_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [ "$(cat VERSION)" = "VERSION=0.9.3" ] || { echo "Keine v0.9.3"; exit 0; }
+          python3 tools/version.py --check
+          CURRENT_SHA=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha)
+          [ "$CHECKED_SHA" = "$CURRENT_SHA" ] || { echo "main hat inzwischen einen neueren Commit"; exit 0; }
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v0.9.3" --jq .ref >/dev/null 2>&1; then
+            echo "Tag v0.9.3 existiert bereits – keine erneute Veröffentlichung"; exit 0
+          fi
+          gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/tags/v0.9.3" -f sha="$CHECKED_SHA"
+          gh workflow run release.yml --repo "$GITHUB_REPOSITORY" --ref main --raw-field tag=v0.9.3
+          echo "Release-Workflow für v0.9.3 gestartet"

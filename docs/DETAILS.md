@@ -82,7 +82,7 @@ Sendezeiten berechnet mit expliziter Kopfzeile, CRC, 8 Symbolen Präambel. Funke
 
 ## Erste Schritte
 
-**Am einfachsten:** passendes ZIP aus dem [Release](https://github.com/Pietwars/HaldenFunk/releases/tag/v0.9.1) laden und nach `ANLEITUNG.md` flashen.
+**Am einfachsten:** passendes ZIP aus dem [Release](https://github.com/Pietwars/HaldenFunk/releases/tag/v0.9.3) laden und nach `ANLEITUNG.md` flashen.
 
 Selbst bauen:
 

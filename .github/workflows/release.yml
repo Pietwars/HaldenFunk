@@ -65,6 +65,16 @@ jobs:
           V=$(python3 tools/version.py --get)
           python3 tools/verify_release.py dist HaldenFunk "$V" littlefs.bin tdeck twatch-s3
           (cd dist && sha256sum *.zip > SHA256SUMS-HaldenFunk-$V.txt)
+      - name: Flyer zur Tag-Version neu erzeugen
+        run: |
+          python3 -m pip install 'qrcode[pil]'
+          python3 tools/flyer/flyer.py
+          python3 - <<'PY'
+          from pathlib import Path
+          for name in ('HaldenFunk-Flyer.pdf', 'HaldenFunk-Flyer-digital.pdf'):
+              path = Path('docs/flyer') / name
+              assert path.is_file() and path.stat().st_size > 10000 and path.open('rb').read(5) == b'%PDF-', name
+          PY
       - name: Release-Text erzeugen
         run: |
           python3 tools/release_notes.py "$(python3 tools/version.py --get)" "${{ github.repository }}" HaldenFunk \

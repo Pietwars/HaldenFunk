@@ -1,0 +1,92 @@
+{
+  "T3S3_SX1262": {
+    "env": "t3s3-sx1262",
+    "chip": "esp32s3",
+    "chip_id": 9,
+    "flash_bytes": 4194304,
+    "ram_bytes": 327680,
+    "app_offset": 65536,
+    "partition_offset": 32768,
+    "boot_offset": 0
+  },
+  "T3S3_SX1262_BLE": {
+    "env": "t3s3-sx1262-ble",
+    "chip": "esp32s3",
+    "chip_id": 9,
+    "flash_bytes": 4194304,
+    "ram_bytes": 327680,
+    "app_offset": 65536,
+    "partition_offset": 32768,
+    "boot_offset": 0
+  },
+  "T3_V161_SX1276": {
+    "env": "t3-v161-sx1276",
+    "chip": "esp32",
+    "chip_id": 0,
+    "flash_bytes": 4194304,
+    "ram_bytes": 327680,
+    "app_offset": 65536,
+    "partition_offset": 32768,
+    "boot_offset": 4096
+  },
+  "T3_V161_SX1276_BLE": {
+    "env": "t3-v161-sx1276-ble",
+    "chip": "esp32",
+    "chip_id": 0,
+    "flash_bytes": 4194304,
+    "ram_bytes": 327680,
+    "app_offset": 65536,
+    "partition_offset": 32768,
+    "boot_offset": 4096
+  },
+  "Heltec_V2": {
+    "env": "heltec-v2-sx1276",
+    "chip": "esp32",
+    "chip_id": 0,
+    "flash_bytes": 8388608,
+    "ram_bytes": 327680,
+    "app_offset": 65536,
+    "partition_offset": 32768,
+    "boot_offset": 4096
+  },
+  "Heltec_V2_WLAN11": {
+    "env": "heltec-v2-sx1276-wifi11",
+    "chip": "esp32",
+    "chip_id": 0,
+    "flash_bytes": 8388608,
+    "ram_bytes": 327680,
+    "app_offset": 65536,
+    "partition_offset": 32768,
+    "boot_offset": 4096
+  },
+  "Heltec_V2_BLE": {
+    "env": "heltec-v2-sx1276-ble",
+    "chip": "esp32",
+    "chip_id": 0,
+    "flash_bytes": 8388608,
+    "ram_bytes": 327680,
+    "app_offset": 65536,
+    "partition_offset": 32768,
+    "boot_offset": 4096
+  },
+  "TDeck_Plus": {
+    "env": "tdeck-sx1262",
+    "chip": "esp32s3",
+    "chip_id": 9,
+    "flash_bytes": 16777216,
+    "ram_bytes": 327680,
+    "app_offset": 65536,
+    "partition_offset": 32768,
+    "boot_offset": 0
+  },
+  "TWatch_S3": {
+    "env": "twatch-s3-sx1262",
+    "chip": "esp32s3",
+    "chip_id": 9,
+    "flash_bytes": 16777216,
+    "ram_bytes": 327680,
+    "app_offset": 65536,
+    "partition_offset": 32768,
+    "boot_offset": 0
+  }
+}

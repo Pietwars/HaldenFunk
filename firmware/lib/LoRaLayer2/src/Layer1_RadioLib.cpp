@@ -27,7 +27,10 @@ int Layer1Class::init() {
     int state = _LoRa->begin(_loraFrequency, _bandwidth, _spreadingFactor, _codingRate,
                              RADIOLIB_SX126X_SYNC_WORD_PRIVATE, _txPower, 8, _tcxo, false);
     if (state == RADIOLIB_ERR_NONE) {
-        _LoRa->setDio2AsRfSwitch(true);
+#ifndef LORA_DIO2_RF_SWITCH
+#define LORA_DIO2_RF_SWITCH 1
+#endif
+        _LoRa->setDio2AsRfSwitch(LORA_DIO2_RF_SWITCH);  // T-Deck: 0 (siehe config.h)
         _LoRa->setCurrentLimit(140);          // PA-Strombegrenzung (mA)
         _LoRa->setRxBoostedGainMode(true);    // bessere Empfindlichkeit (+~2 dB, etwas mehr Strom)
         _LoRa->setCRC(2);

@@ -1,5 +1,12 @@
 # Changelog – HaldenFunk
 
+## Unveröffentlicht (nach 0.9.1)
+
+- **Kern auf DisAHRsterRadio mit T-Deck-/T-Watch-Anpassung** gebracht (`region/CORE`, `tools/core_sync.py`).
+- **Neue Boards LILYGO T-Deck Plus und LILYGO T-Watch S3** (ESP32-S3, SX1262; Profile `tdeck-sx1262`, `twatch-s3-sx1262`). Minimale Anpassung ohne Display-Treiber: Das Display bleibt dunkel, Bedienung über WLAN.
+- **Release und CI nur noch für T-Deck Plus und T-Watch S3.** Heltec V2, T3-S3 und T3 V1.6.1 werden nicht mehr gebaut; das Release v0.9.1 bleibt unverändert.
+- **Flash- und Speicherprüfung im CI** (`tools/validate_memory.py`, Boardvertrag `tools/memory_boards.json`, Hosttests).
+
 ## 0.9.1 · 18.10.2026 · Release
 
 - **Flyer 0.9.1 (nachgereicht):** Druck-PDF (QR-Code zum Release v0.9.1 und zur Demo) und Digital-PDF (klickbare Links) neu erzeugt, mit Vorschau der aktuellen Weboberfläche; Inhalt und Boards entsprechen dem Release.

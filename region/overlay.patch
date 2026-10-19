@@ -1,29 +1,29 @@
 diff --git a/.github/workflows/build.yml b/.github/workflows/build.yml
-index 4703f47..d4036d3 100644
+index 2a0f7c4..bfc01ec 100644
 --- a/.github/workflows/build.yml
 +++ b/.github/workflows/build.yml
-@@ -58,3 +58,4 @@ jobs:
+@@ -69,3 +69,4 @@ jobs:
            name: firmware-${{ matrix.env }}
            if-no-files-found: error
-           path: artefakt/*.bin
+           path: artefakt/*
 +
 diff --git a/.github/workflows/release.yml b/.github/workflows/release.yml
-index 15f9ab2..ce535e5 100644
+index fe69be9..57f1a16 100644
 --- a/.github/workflows/release.yml
 +++ b/.github/workflows/release.yml
 @@ -63,11 +63,11 @@ jobs:
        - name: Pakete prüfen (Vollständigkeit, Prüfsummen, Version)
          run: |
            V=$(python3 tools/version.py --get)
--          python3 tools/verify_release.py dist DisAHRsterRadio "$V" littlefs.bin heltec-v2
+-          python3 tools/verify_release.py dist DisAHRsterRadio "$V" littlefs.bin tdeck twatch-s3
 -          (cd dist && sha256sum *.zip > SHA256SUMS-DisAHRsterRadio-$V.txt)
-+          python3 tools/verify_release.py dist HaldenFunk "$V" littlefs.bin heltec-v2
++          python3 tools/verify_release.py dist HaldenFunk "$V" littlefs.bin tdeck twatch-s3
 +          (cd dist && sha256sum *.zip > SHA256SUMS-HaldenFunk-$V.txt)
        - name: Release-Text erzeugen
          run: |
 -          python3 tools/release_notes.py "$(python3 tools/version.py --get)" "${{ github.repository }}" DisAHRsterRadio \
 +          python3 tools/release_notes.py "$(python3 tools/version.py --get)" "${{ github.repository }}" HaldenFunk \
-             "heltec-v2=Heltec WiFi LoRa 32 V2 (SX1276)" | tee notes.md
+             "tdeck=LILYGO T-Deck Plus (SX1262)" "twatch-s3=LILYGO T-Watch S3 (SX1262)" | tee notes.md
        - name: Release veröffentlichen
          if: env.TAG != ''
 @@ -79,7 +79,7 @@ jobs:
@@ -37,10 +37,10 @@ index 15f9ab2..ce535e5 100644
            fi
            gh release view "$TAG" --json assets --jq '.assets[].name'
 diff --git a/firmware/main.ino b/firmware/main.ino
-index 1ea44cc..a9a6886 100644
+index 160e2d4..8a7aa46 100644
 --- a/firmware/main.ino
 +++ b/firmware/main.ino
-@@ -49,9 +49,9 @@
+@@ -54,9 +54,9 @@ XPowersAXP2101 pmu;
  #include "DisasterHistory.h"
  #include "DisasterMiddleware.h"
  
@@ -53,7 +53,7 @@ index 1ea44cc..a9a6886 100644
  
  #define INDEX_FILE "index.html"
  
-@@ -276,7 +276,7 @@ void setupHTTPSever()
+@@ -281,7 +281,7 @@ void setupHTTPSever()
    http_server.on("/api/info", HTTP_GET, [](AsyncWebServerRequest *request) {
      char json[768];
      snprintf(json, sizeof(json),
@@ -62,7 +62,7 @@ index 1ea44cc..a9a6886 100644
               "\"lora\":%s,\"preset\":%d,\"presetId\":\"%s\",\"presetName\":\"%s\",\"freq\":%.3f,\"bw\":%.1f,\"sf\":%d,\"cr\":\"4/%d\",\"airtimeMs\":%lu,\"airtimeBudgetMs\":%lu,\"airtimePct\":%.2f,\"dutyLimitPct\":%.0f,\"txDeferred\":%lu,\"txPower\":%d,\"routes\":%d,\"clients\":%d,\"sd\":%s,\"uptime\":%lu,"
               "\"heap\":%u,\"minHeap\":%u,\"maxBlock\":%u,\"heapWarn\":%u}",
               DAR_VERSION, BOARD_NAME, nodeAddress, ssid, loraInitialized ? "true" : "false", radioPreset, activePreset().id, activePreset().name, loraFreqMHz(), activePreset().bwKHz, activePreset().sf, activePreset().cr,
-@@ -366,11 +366,11 @@ public:
+@@ -371,11 +371,11 @@ public:
      Serial.printf("WelcomeMessage username: >%s<\n", username.c_str());
      if (username.isEmpty())
      {
@@ -76,7 +76,7 @@ index 1ea44cc..a9a6886 100644
      }
  
      struct Datagram datagram1 = buildDatagram(BROADCAST, 'i', (uint8_t *)data, msgLen);
-@@ -628,7 +628,7 @@ void setup()
+@@ -672,7 +672,7 @@ void setup()
    setCpuFrequencyMhz(CLOCK_SPEED); //Set CPU clock in config.h
    getCpuFrequencyMhz(); //Get CPU clock
  
@@ -86,7 +86,7 @@ index 1ea44cc..a9a6886 100644
  #ifndef WIFI_LATE
    setupNetwork();
 diff --git a/firmware/platformio.ini b/firmware/platformio.ini
-index c946fba..3216e02 100644
+index bd44323..028028e 100644
 --- a/firmware/platformio.ini
 +++ b/firmware/platformio.ini
 @@ -1,4 +1,4 @@
@@ -109,7 +109,7 @@ index deb7b21..b511e9a 100644
            (uint8_t)(uniqueId >> 16), (uint8_t)(uniqueId >> 24),
            (uint8_t)(uniqueId >> 32), (uint8_t)(uniqueId >> 40));
 diff --git a/tools/ANLEITUNG.template.md b/tools/ANLEITUNG.template.md
-index 40b12d3..2ab2a52 100644
+index f560ba4..14b865d 100644
 --- a/tools/ANLEITUNG.template.md
 +++ b/tools/ANLEITUNG.template.md
 @@ -1,10 +1,10 @@
@@ -122,30 +122,30 @@ index 40b12d3..2ab2a52 100644
 -Version @VERSION@ (Commit @COMMIT@) · Quelle: https://github.com/Pietwars/DisAHRsterRadio
 +Version @VERSION@ (Commit @COMMIT@) · Quelle: https://github.com/Pietwars/HaldenFunk
  
--> ⚠️ Kein zertifiziertes Notrufsystem. In Lebensgefahr immer **112** wählen. Diese Version ist auf echter Hardware **nicht abgenommen** (frühere Stände liefen beim Nutzer auf einem LILYGO T3 V1.6.1).
-+> ⚠️ Kein zertifiziertes Notrufsystem. In Lebensgefahr immer **112** wählen. Diese Version ist auf echter Hardware **nicht abgenommen** (die gleiche Basis lief bei DisAHRsterRadio auf einem LILYGO T3 V1.6.1).
+-> ⚠️ Kein zertifiziertes Notrufsystem. In Lebensgefahr immer **112** wählen. Diese Version ist auf echter Hardware **nicht abgenommen** (frühere Stände liefen beim Nutzer auf einem LILYGO T3 V1.6.1; T-Deck Plus und T-Watch S3 sind neu und noch nicht auf Hardware geprüft).
++> ⚠️ Kein zertifiziertes Notrufsystem. In Lebensgefahr immer **112** wählen. Diese Version ist auf echter Hardware **nicht abgenommen** (die gleiche Basis lief bei DisAHRsterRadio auf einem LILYGO T3 V1.6.1; T-Deck Plus und T-Watch S3 sind neu und noch nicht auf Hardware geprüft).
  
  ## 1. Zuerst die Antenne!
  
-@@ -15,7 +15,7 @@ Version @VERSION@ (Commit @COMMIT@) · Quelle: https://github.com/Pietwars/DisAH
- 1. Board per USB-Datenkabel an den Rechner (Chrome oder Edge am PC/Mac, nicht iPhone).
+@@ -16,7 +16,7 @@ Version @VERSION@ (Commit @COMMIT@) · Quelle: https://github.com/Pietwars/DisAH
  2. https://espressif.github.io/esptool-js/ öffnen, Baudrate 921600 (bei Problemen 115200), **Connect** und den Port wählen.
-    - T3-S3: Wird kein Port gefunden, **BOOT** gedrückt halten, kurz **RST** drücken, BOOT loslassen.
+    - T-Deck Plus: Wird kein Port gefunden, den **Trackball** gedrückt halten und einschalten (bzw. Reset), dann loslassen.
+    - T-Watch S3: USB-C neu einstecken; bei ausgeschalteter Uhr kurz die Seitentaste drücken.
 -3. Bei **Flash Address** `0x0` eintragen und `DisAHRsterRadio-@ZIP@-factory.bin` wählen.
 +3. Bei **Flash Address** `0x0` eintragen und `HaldenFunk-@ZIP@-factory.bin` wählen.
  4. Optional zuerst **Erase Flash** (löscht alles, auch gespeicherte Aushänge und Einstellungen).
  5. **Program** und warten, bis „Leaving…“ erscheint. Dann **RST** drücken oder kurz vom Strom trennen.
  
-@@ -23,7 +23,7 @@ Die factory-Datei enthält Bootloader (@BOOT@), Partitionstabelle (0x8000), boot
+@@ -26,7 +26,7 @@ Die factory-Datei enthält Bootloader (@BOOT@), Partitionstabelle (0x8000), boot
  
- ## 3. Verbinden
+ Auf T-Deck Plus und T-Watch S3 bleibt das Display in dieser Version **dunkel** (noch kein Display-Treiber) – das Gerät läuft trotzdem; die Bedienung erfolgt komplett über das WLAN im Browser. Die serielle Ausgabe (USB, 115200 Baud) zeigt den Start.
  
 -Am Handy das WLAN `DisAHRsterRadio-XXXXXX` auswählen und verbinden (höchstens 4 Handys). Bei „Kein Internet“ verbunden bleiben, dann `http://192.168.4.1` oder `http://disahrster.local` öffnen. Achtung: offenes, unverschlüsseltes WLAN – jede Person in Reichweite kann mitlesen und senden. Telnet ist entfernt; Konfiguration erfolgt über USB. BLE-UART ohne PIN ist in den zusätzlichen `*-ble`-Testprofilen verfügbar; deren abweichende Partitionierung beachten.
 +Am Handy das WLAN `HaldenFunk-XXXXXX` auswählen und verbinden (höchstens 4 Handys). Bei „Kein Internet“ verbunden bleiben, dann `http://192.168.4.1` oder `http://haldenfunk.local` öffnen. Achtung: offenes, unverschlüsseltes WLAN – jede Person in Reichweite kann mitlesen und senden. Telnet ist entfernt; Konfiguration erfolgt über USB. BLE-UART ohne PIN ist in den zusätzlichen `*-ble`-Testprofilen verfügbar; deren abweichende Partitionierung beachten.
  
  ## 4. Update (nur Firmware)
  
-@@ -37,7 +37,7 @@ Nur wenn sich Weboberfläche oder Karten geändert haben: zusätzlich `teile/lit
+@@ -40,7 +40,7 @@ Nur wenn sich Weboberfläche oder Karten geändert haben: zusätzlich `teile/lit
  
  | Datei | Adresse |
  |---|---|
@@ -192,7 +192,7 @@ index c19346e..292d5ff 100644
      os.makedirs(OUT, exist_ok=True)
      base = os.path.join(OUT, fn.replace('.geojson', '.json'))
 diff --git a/tools/package.sh b/tools/package.sh
-index 305787e..1bcd96e 100755
+index 3334c1f..5b6360d 100755
 --- a/tools/package.sh
 +++ b/tools/package.sh
 @@ -5,7 +5,7 @@ set -euo pipefail

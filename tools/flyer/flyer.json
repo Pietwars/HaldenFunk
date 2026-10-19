@@ -10,11 +10,11 @@
   "Schnellmeldung: Hilfe/OK mit einem Tipp",
   "Schwarzes Brett für Aushänge",
   "Offline-Karten Mansfelder Land",
-  "Firmware im Release: Heltec V2",
+  "Firmware: T-Deck Plus, T-Watch S3",
   "Open Source (GPLv3/AGPLv3)"
  ],
  "steps": [
-  "Firmware aus dem Release v@VERSION@ auf den Heltec V2 flashen, Antenne und Strom anschließen.",
+  "Firmware aus dem Release v@VERSION@ auf T-Deck Plus oder T-Watch S3 flashen, Antenne und Strom anschließen.",
   "Handy mit dem WLAN <b>HaldenFunk-XXXXXX</b> verbinden (offenes WLAN).",
   "Im Browser <b>192.168.4.1</b> öffnen – chatten, melden, Karte nutzen."
  ],

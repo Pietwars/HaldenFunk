@@ -33,6 +33,10 @@ HaldenFunk ist die **Regionalvariante von [Pietwars/DisAHRsterRadio](https://git
 | `t3s3-sx1262` | LILYGO T3-S3 | SX1262 | – (0.9.1 vorerst nicht im Release) |
 | `t3-v161-sx1276` | LILYGO / TTGO T3 V1.6.1 | SX1276 | – (0.9.1 vorerst nicht im Release) |
 | `heltec-v2-sx1276` | Heltec WiFi LoRa 32 V2 | SX1276 | `HaldenFunk-0.9.1-heltec-v2.zip` |
+| `tdeck-sx1262` | LILYGO T-Deck Plus (ab dem nächsten Release, ohne Display-Treiber) | SX1262 | `HaldenFunk-<Version>-tdeck.zip` |
+| `twatch-s3-sx1262` | LILYGO T-Watch S3 (ab dem nächsten Release, ohne Display-Treiber) | SX1262 | `HaldenFunk-<Version>-twatch-s3.zip` |
+
+CI und Release bauen nach der T-Deck/T-Watch-Anpassung nur noch `tdeck-sx1262` und `twatch-s3-sx1262`; die übrigen Profile bleiben im Code.
 | `heltec-v2-sx1276-wifi11` | Heltec WiFi LoRa 32 V2, WLAN mit 11 statt 8,5 dBm (falls das WLAN zu schwach ist) | SX1276 | – (nur CI-Artefakt / selbst bauen) |
 
 Jedes ZIP enthält `factory.bin` (ab Adresse 0x0), die Einzelteile, `SHA256SUMS` und eine `ANLEITUNG.md` (Flashen im Browser mit esptool-js). Releases entstehen mit dem Workflow „Release“ bei jedem Tag `v*` und heißen `HaldenFunk-<Version>-<Board>.zip`. Ab 0.9.1 enthält das Release vorerst nur das Paket für den **Heltec V2**; T3-S3 und T3 V1.6.1 bleiben im Code und im CI. Den LILYGO T-Deck Plus unterstützt HaldenFunk nicht. Die `factory.bin` an 0x0 überschreibt alle Einstellungen.

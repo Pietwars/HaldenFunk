@@ -35,6 +35,8 @@ Flyer (A5): [Druck-PDF mit QR-Codes](docs/flyer/HaldenFunk-Flyer.pdf) · [Digita
 
 LILYGO T3-S3 und T3 V1.6.1 bleiben im Code und im CI, sind aber nicht im Release – siehe [Details](docs/DETAILS.md#unterstützte-boards).
 
+**Ab dem nächsten Release (vorbereitet):** nur noch **LILYGO T-Deck Plus** (`…-tdeck.zip`) und **LILYGO T-Watch S3** (`…-twatch-s3.zip`), beide ESP32-S3 + SX1262 (Kern-Anpassung aus DisAHRsterRadio). Das Display bleibt dort vorerst dunkel; Bedienung über WLAN im Browser. Heltec V2 und die T3-Boards werden dann nicht mehr gebaut (Profile bleiben im Code, das Release v0.9.1 bleibt unverändert).
+
 ## Schnellstart
 
 1. **Flashen:** ZIP aus dem [Release](https://github.com/Pietwars/HaldenFunk/releases/tag/v0.9.1) entpacken und `HaldenFunk-0.9.1-heltec-v2-factory.bin` an Adresse **0x0** schreiben (z. B. mit [esptool-js](https://espressif.github.io/esptool-js/), Anleitung als `ANLEITUNG.md` im ZIP). Update ohne Datenverlust: nur `teile/firmware.bin` an 0x10000.

@@ -76,15 +76,34 @@ index 160e2d4..8a7aa46 100644
      }
  
      struct Datagram datagram1 = buildDatagram(BROADCAST, 'i', (uint8_t *)data, msgLen);
-@@ -672,7 +672,7 @@ void setup()
+@@ -672,11 +672,8 @@ void setup()
    setCpuFrequencyMhz(CLOCK_SPEED); //Set CPU clock in config.h
    getCpuFrequencyMhz(); //Get CPU clock
  
 -  Serial.printf("\nDisAHRsterRadio %s (%s) - basiert auf sudomesh/disaster-radio\n", DAR_VERSION, BOARD_NAME);
 +  Serial.printf("\nHaldenFunk %s (%s) - basiert auf sudomesh/disaster-radio\n", DAR_VERSION, BOARD_NAME);
    delay(STARTUP_STAGGER_MS); // gestaffelter Start: Spannung stabilisieren lassen
- #ifndef WIFI_LATE
-   setupNetwork();
+-#ifndef WIFI_LATE
+-  setupNetwork();
+-#endif
+   bootMark("SD");
+   setupSD();
+   bootMark("LittleFS");
+@@ -683,9 +680,14 @@ void setup()
+   setupFS();
+   setupHistory();
+   setupSerial();
+   board = new BoardClient(fsInitialized ? (fs::FS *)&LittleFS : NULL);
+   radio->connect(board);
++#ifndef WIFI_LATE
++  // HTTP und WebSocket erst nach SD/LittleFS und History starten.
++  // serveStatic() benoetigt ein bereits eingebundenes Dateisystem.
++  setupNetwork();
++#endif
+   delay(STARTUP_STAGGER_MS);
+   bootMark("Versorgung");
+   setupBoardPower();
+   bootMark("LoRa");
 diff --git a/firmware/platformio.ini b/firmware/platformio.ini
 index bd44323..028028e 100644
 --- a/firmware/platformio.ini

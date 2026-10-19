@@ -1,5 +1,13 @@
 # Changelog – HaldenFunk
 
+## 0.9.3 · 19.10.2026 · LittleFS-/Webserver-Hotfix
+
+- **Weboberfläche beim Start:** Auf T-Deck Plus und T-Watch S3 wird SD/LittleFS vor dem WLAN-/HTTP-Server initialisiert. Dadurch kann `serveStatic()` die Weboberfläche beim ersten Boot registrieren (Fix aus PR #17).
+- **Regionalkern:** HaldenFunk-Overlay und `tools/core_sync.py --check` berücksichtigen dieselbe Startreihenfolge. Regionalfunktionen und Karten bleiben unverändert.
+- **Pakete:** Für T-Deck Plus und T-Watch S3 neu gebaut, mit LittleFS-Abbild, Factory-Datei, Anleitung und SHA256-Prüfsummen. Keine Hardware-Abnahme; funktionaler Boot-/Funk-Test bleibt erforderlich.
+- **v0.9.2:** Wurde vor dem Hotfix erstellt und soll nicht mehr als aktuelle Firmware verwendet werden.
+
+
 ## 0.9.2 · 19.10.2026 · Release
 
 - **README und Doku:** Projektfamilie mit den vier aktiven Repositorys (DisAHRsterRadio-MeshCore, DisAHRsterRadio, HaldenFunk, HaldenFunk-MeshCore); Pietwars/DisasterMesh ist archiviert und gehört nicht mehr dazu. Geräte-Tabelle und Schnellstart nennen nur noch T-Deck Plus und T-Watch S3.

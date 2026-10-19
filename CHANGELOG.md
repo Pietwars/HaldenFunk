@@ -1,6 +1,9 @@
 # Changelog – HaldenFunk
 
-## Unveröffentlicht (nach 0.9.1)
+## 0.9.2 · 19.10.2026 · Release
+
+- **README und Doku:** Projektfamilie mit den vier aktiven Repositorys (DisAHRsterRadio-MeshCore, DisAHRsterRadio, HaldenFunk, HaldenFunk-MeshCore); Pietwars/DisasterMesh ist archiviert und gehört nicht mehr dazu. Geräte-Tabelle und Schnellstart nennen nur noch T-Deck Plus und T-Watch S3.
+- **Flyer 0.9.2:** Druck- und Digital-PDF neu erzeugt (Release v0.9.2, Boards T-Deck Plus und T-Watch S3).
 
 - **Kern auf DisAHRsterRadio mit T-Deck-/T-Watch-Anpassung** gebracht (`region/CORE`, `tools/core_sync.py`).
 - **Neue Boards LILYGO T-Deck Plus und LILYGO T-Watch S3** (ESP32-S3, SX1262; Profile `tdeck-sx1262`, `twatch-s3-sx1262`). Minimale Anpassung ohne Display-Treiber: Das Display bleibt dunkel, Bedienung über WLAN.

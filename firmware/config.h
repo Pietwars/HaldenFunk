@@ -6,7 +6,7 @@
 #include "secrets.h"
 #endif
 
-#define DAR_VERSION "0.9.1"
+#define DAR_VERSION "0.9.2"
 #define CLOCK_SPEED 240
 // Unter dieser Grenze freien Heaps warnen Weboberfläche (rot) und serielles [HEAP]-Protokoll
 #ifndef HEAP_WARN_BYTES

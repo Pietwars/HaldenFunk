@@ -674,9 +674,6 @@ void setup()
 
   Serial.printf("\nHaldenFunk %s (%s) - basiert auf sudomesh/disaster-radio\n", DAR_VERSION, BOARD_NAME);
   delay(STARTUP_STAGGER_MS); // gestaffelter Start: Spannung stabilisieren lassen
-#ifndef WIFI_LATE
-  setupNetwork();
-#endif
   bootMark("SD");
   setupSD();
   bootMark("LittleFS");
@@ -685,6 +682,11 @@ void setup()
   setupSerial();
   board = new BoardClient(fsInitialized ? (fs::FS *)&LittleFS : NULL);
   radio->connect(board);
+#ifndef WIFI_LATE
+  // HTTP und WebSocket erst nach SD/LittleFS und History starten.
+  // serveStatic() benoetigt ein bereits eingebundenes Dateisystem.
+  setupNetwork();
+#endif
   delay(STARTUP_STAGGER_MS);
   bootMark("Versorgung");
   setupBoardPower();

@@ -6,14 +6,9 @@
 #include <LoRaLayer2.h>
 #include "../utils/utils.h"
 #include "../../config.h"
-#ifndef SIM
 #include "settings/settings.h"
 #include <RadioPresets.h>
-#endif
 
-#ifdef SIM
-Console::Console(){};
-#endif
 
 void Console::printf(const char* format, ...)
 {
@@ -30,13 +25,11 @@ void Console::printf(const char* format, ...)
 
 void Console::setup()
 {
-  #ifndef SIM
   DisasterMiddleware::setup();
   if (history)
   {
     history->replay(this);
   }
-  #endif
   sessionConnected = 0;
 }
 
@@ -46,7 +39,6 @@ void Console::usage()
 }
 
 // TODO add support for `/get` and `/set` in simulator
-#ifndef SIM
 void Console::getUsage()
 {
   printf("OPTIONs include,\r\n");
@@ -141,7 +133,7 @@ void Console::txpowerSet(std::vector<char *> args)
   int msgLen;
   int value;
 
-  sscanf(&args[2][0], "%d", &value);
+  value = parseLong(&args[2][0], -1);
   if((value < 2) || (value > 20)){
     printf("Invalid value provided, type '/set txpower VAL'\r\n");
     txpowerUsage();
@@ -159,7 +151,7 @@ void Console::lorafrqSet(std::vector<char *> args)
 {
   // Frequenz/Bandbreite/SF/CR kommen jetzt aus dem Funkprofil
   int value = -1;
-  sscanf(&args[2][0], "%d", &value);
+  value = parseLong(&args[2][0], -1);
   if (value < 0 || value >= RADIO_PRESET_COUNT) {
     printf("Funkprofil 0..%d erwartet: '/set preset N' (0 = EU Narrow)\r\n", RADIO_PRESET_COUNT - 1);
     return;
@@ -176,7 +168,7 @@ void Console::sfSet(std::vector<char *> args)
   int msgLen;
   int value;
 
-  sscanf(&args[2][0], "%d", &value);
+  value = parseLong(&args[2][0], -1);
   if (true) {
     // Spreizfaktor ist Teil des Funkprofils (alle Knoten muessen gleich sein)
     printf("SF wird ueber das Funkprofil gesetzt: '/set preset N'\r\n");
@@ -195,7 +187,7 @@ void Console::dutySet(std::vector<char *> args)
   int msgLen;
   double value;
 
-  sscanf(&args[2][0], "%lf", &value);
+  value = parseDouble(&args[2][0], -1);
   if((value <= 0) || (value > 1)){
     printf("Invalid value provided, type '/set duty VAL'\r\n");
     dutyUsage();
@@ -215,7 +207,7 @@ void Console::intervalSet(std::vector<char *> args)
   int msgLen;
   long value; // this should use an unsigned long, but LL2 would need to be updated also
 
-  sscanf(&args[2][0], "%ld", &value);
+  value = parseLong(&args[2][0], -1);
   if(value < 0 || value > 2147483647){ // i.e. max value of signed long
     printf("Invalid value provided, type '/set interval VAL'\r\n");
     intervalUsage();
@@ -235,7 +227,7 @@ void Console::gpsSet(std::vector<char *> args)
   int msgLen;
   long value; // this should use an unsigned long, but LL2 would need to be updated also
 
-  sscanf(&args[2][0], "%ld", &value);
+  value = parseLong(&args[2][0], -1);
   if(value < 0 || value > 2147483647){ // i.e. max value of signed long
     printf("Invalid value provided, type '/set gps VAL'\r\n");
     gpsUsage();
@@ -317,7 +309,6 @@ void Console::set(std::vector<char *> args)
     setUsage();
   }
 }
-#endif
 
 void Console::processLine(char *message, size_t len)
 {
@@ -358,7 +349,6 @@ void Console::processLine(char *message, size_t len)
       server->disconnect(this);
       server->connect(client);
     }
-    #ifndef SIM
     else if ((strncmp(&args[0][1], "get", 3) == 0) && (args.size() > 1))
     {
       get(args);
@@ -410,7 +400,6 @@ void Console::processLine(char *message, size_t len)
     {
       ESP.restart();
     }
-    #endif
     else if ((strncmp(&args[0][1], "lora", 4) == 0))
     {
       // send messsage to LoRaClient, wait for response from LL2
@@ -425,7 +414,6 @@ void Console::processLine(char *message, size_t len)
       client->receive(response, msgLen + DATAGRAM_HEADER);
     }
   }
-  #ifndef SIM
   else if (username.length() > 0)
   {
     msgLen = sprintf((char *)response.message, "00c|<%s>%s", username.c_str(), msgBuff);
@@ -435,7 +423,6 @@ void Console::processLine(char *message, size_t len)
     memcpy(response.message, &response.message[4], msgLen - 4);
     response.message[msgLen - 4] = '\n';
   }
-  #endif
   else if(msgBuff[0] == '@')
   {
     // "direct"/routed message
@@ -470,7 +457,6 @@ void Console::printBanner()
   printf("/ _  / (_-</ _ `(_-</ __/ -_) __/ _   / __/ _ `/ _  / / _ \\\r\n");
   printf("\\_,_/_/___/\\_,_/___/\\__/\\__/_/   (_) /_/  \\_,_/\\_,_/_/\\___/\r\n");
   printf("v1.0.0-rc.2\r\n");
-  #ifndef SIM
   /*
   if(Layer1.loraInitialized()){
     printf("LoRa transceiver connected\r\n");
@@ -478,7 +464,6 @@ void Console::printBanner()
     printf("WARNING: LoRa transceiver not found!\r\n");
   }
   */
-  #endif
   printf("Local address of your node is ");
   memcpy(request.destination, BROADCAST, ADDR_LENGTH);
   request.type = 'i';
@@ -490,7 +475,6 @@ void Console::printBanner()
 
 void Console::printPrompt()
 {
-  #ifndef SIM
   if (username.length() > 0)
   {
     printf("<%s> ", username.c_str());
@@ -499,9 +483,6 @@ void Console::printPrompt()
   {
     printf("< > ");
   }
-  #else
-  printf("< > ");
-  #endif
 }
 
 void Console::transmit(DisasterClient *client, struct Datagram datagram, size_t len)

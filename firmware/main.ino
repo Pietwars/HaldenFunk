@@ -1,6 +1,5 @@
 #include <Arduino.h>
 
-// required for LoRa and/or AsyncSDServer libraries?
 #include <FS.h>
 #include <SPI.h>
 
@@ -9,12 +8,17 @@
 #include <ESPAsyncWebServer.h>
 #include <ESPmDNS.h>
 #include <Preferences.h>
-#include <SD.h>
 #include <LittleFS.h>
+#include "config.h"
+#ifdef DAR_OMI
+#include <DNSServer.h> // Captive Portal fuer Omi
+#endif
+#ifdef HAS_SD
+#include <SD.h>
+#endif
 #ifdef HAS_OLED
 #include <SSD1306Wire.h>
 #endif
-#include "config.h"
 #ifdef DISABLE_BROWNOUT
 #include "soc/soc.h"
 #include "soc/rtc_cntl_reg.h"
@@ -38,17 +42,23 @@ XPowersAXP2101 pmu;
 #include "client/HistoryRecord.h"
 #include "client/LoRaClient.h"
 #include "client/StreamClient.h"
-#include "client/TCPClient.h"
 #include "client/WebSocketClient.h"
+#ifdef GPS_SERIAL
 #include "client/GPSClient.h"
+#endif
 #include "client/BoardClient.h"
+#ifdef TDECK_SCREEN
+#include "client/TDeckUI.h"
+#endif
 #include "client/BleUartClient.h"
 
 // middleware
 #include "middleware/Console.h"
 #include "middleware/HistoryReplay.h"
 // history
+#ifdef HAS_SD
 #include "history/HistorySD.h"
+#endif
 #include "history/HistoryMemory.h"
 
 #include "DisasterHistory.h"
@@ -56,7 +66,11 @@ XPowersAXP2101 pmu;
 
 #define MDNS_NAME_PREFIX "haldenfunk"
 #define HOST_NAME "haldenfunk"
+#ifdef DAR_OMI
+#define WIFI_AP_SSID_PREFIX "Notfunk-" // Omi: kurzer, verstaendlicher WLAN-Name
+#else
 #define WIFI_AP_SSID_PREFIX "HaldenFunk-"
+#endif
 
 #define INDEX_FILE "index.html"
 
@@ -64,15 +78,16 @@ XPowersAXP2101 pmu;
 SSD1306Wire display(0x3c, OLED_SDA, OLED_SCL);
 #endif
 
-#ifdef SD_SCK
+#ifdef HAS_SD
 SPIClass sd_card(HSPI);
-#else
-SPIClass sd_card(VSPI_OR_FSPI);
 #endif
 
 
 AsyncWebServer http_server(80);
 AsyncWebSocket ws_server("/ws");
+#ifdef DAR_OMI
+DNSServer dns_server;
+#endif
 
 #ifdef HAS_BLE
 BleUartClient ble_client;
@@ -80,16 +95,9 @@ BleUartClient ble_client;
 
 #ifdef RL_SX1276
 SX1276 lora = new Module(LORA_CS, LORA_IRQ, LORA_RST, LORA_BUSY);
-  #ifdef DUAL_LORA
-  SX1276 lora2 = new Module(LORA2_CS, LORA2_IRQ, LORA2_RST, LORA2_BUSY);
-  #endif
 #endif
-
 #ifdef RL_SX1262
 SX1262 lora = new Module(LORA_CS, LORA_IRQ, LORA_RST, LORA_BUSY);
-  #ifdef DUAL_LORA
-  SX1262 lora2 = new Module(LORA2_CS, LORA2_IRQ, LORA2_RST, LORA2_BUSY);
-  #endif
 #endif
 
 LL2Class *LL2;
@@ -104,6 +112,9 @@ Layer1Class *Layer1_main = NULL;
 DisasterRadio *radio = new DisasterRadio();
 DisasterHistory *history = NULL;
 BoardClient *board = NULL;
+#ifdef TDECK_SCREEN
+TDeckUI tdeckUI;
+#endif
 
 int internal_clients = 0;
 int clients = 0;
@@ -192,8 +203,12 @@ void setupWiFi()
 #endif
     WiFi.setHostname(HOST_NAME);
     apOk = startSoftAP();
+#ifdef DAR_OMI
+    // Jede Adresse zeigt auf dieses Geraet -> Handy oeffnet die Seite automatisch
+    dns_server.setErrorReplyCode(DNSReplyCode::NoError);
+    dns_server.start(53, "*", WiFi.softAPIP());
+#endif
 
-    ip = WiFi.localIP();
     ip = WiFi.softAPIP();
     Serial.printf("\n==============================\nWLAN: %s\nOffenes WLAN - kein Passwort\nBrowser: http://%s\n==============================\n",
                   ssid, ip.toString().c_str());
@@ -223,7 +238,7 @@ void setupMDNS()
 
 void setupSD()
 {
-#ifdef SD_SCK
+#ifdef HAS_SD
   Serial.println("* Initializing SD card...");
   sd_card.begin(SD_SCK, SD_MISO, SD_MOSI, -1);
   if (SD.begin(SD_CS, sd_card))
@@ -252,23 +267,22 @@ void setupFS()
 
 bool checkFileIsReadable(FS &fs, const char *path)
 {
-  if (fs.exists(path))
-  {
-    return !!fs.open(path, "r");
-  }
-  return false;
+  return fs.exists(path) && fs.open(path, "r");
 }
 
 void setupHTTPSever()
 {
   Serial.println("* Initializing HTTP server...");
 
+#ifdef HAS_SD
   if (sdInitialized && checkFileIsReadable(SD, "/" INDEX_FILE))
   {
     Serial.println(" --> Serving web application from SD card");
     http_server.serveStatic("/", SD, "/").setDefaultFile(INDEX_FILE).setCacheControl("max-age=600");
   }
-  else if (fsInitialized && checkFileIsReadable(LittleFS, "/" INDEX_FILE))
+  else
+#endif
+  if (fsInitialized && checkFileIsReadable(LittleFS, "/" INDEX_FILE))
   {
     Serial.println(" --> Serving web application from LittleFS");
     http_server.serveStatic("/", LittleFS, "/").setDefaultFile(INDEX_FILE);
@@ -292,6 +306,7 @@ void setupHTTPSever()
     request->send(200, "application/json", json);
   });
 
+#ifndef DAR_OMI // Omi: Funkprofil fest (EU Narrow), keine Einstellungen
   // Funkprofile auflisten / waehlen (gespeichert im NVS, wirksam nach Neustart)
   http_server.on("/api/presets", HTTP_GET, [](AsyncWebServerRequest *request) {
     String j = "[";
@@ -314,13 +329,19 @@ void setupHTTPSever()
     if (!t) { esp_timer_create_args_t a = {}; a.callback = [](void *) { ESP.restart(); }; a.name = "rst"; esp_timer_create(&a, &t); }
     esp_timer_start_once(t, 1500000);
   });
+#endif
 
   http_server.on("/api/board", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send(200, "application/json", board ? board->toJson() : String("[]"));
   });
 
   http_server.onNotFound([](AsyncWebServerRequest *request) {
+#ifdef DAR_OMI
+    // Captive Portal: unbekannte Seiten (z. B. Handy-Internettest) auf die Startseite umleiten
+    request->redirect("http://" + WiFi.softAPIP().toString() + "/");
+#else
     request->send(404);
+#endif
   });
 
   http_server.onRequestBody([](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
@@ -335,6 +356,7 @@ void setupHistory()
 {
   Serial.println("* Initializing history...");
 
+#ifdef HAS_SD
   if (sdInitialized)
   {
     HistorySD *history_sd_client = new HistorySD(&sd_card);
@@ -344,6 +366,7 @@ void setupHistory()
       history = history_sd_client;
     }
   }
+#endif
   if (!history)
   {
     Serial.println(" --> Storing (limited) history in memory");
@@ -368,14 +391,25 @@ public:
   {
     char data[128] = {0};
     int msgLen = 0;
+#ifdef DAR_OMI
+    // Omi: keine Technik-Hinweise, nur wenn der Funk nicht geht
+    if (!loraInitialized)
+    {
+      msgLen = sprintf(data, "00c|Achtung: Der Funk geht nicht. Bitte das Gerät aus- und wieder einschalten.");
+      struct Datagram d = buildDatagram(BROADCAST, 'i', (uint8_t *)data, msgLen);
+      client->receive(d, msgLen + DATAGRAM_HEADER);
+    }
+    client->setup();
+    return;
+#endif
     Serial.printf("WelcomeMessage username: >%s<\n", username.c_str());
     if (username.isEmpty())
     {
-      msgLen = sprintf(data, "00c|Glueck Auf! Willkommen bei HaldenFunk ");
+      msgLen = sprintf(data, "00c|Glueck Auf! Glueck Auf! Willkommen bei HaldenFunk ");
     }
     else
     {
-      msgLen = snprintf(data, 127, "00c|Glueck Auf! Willkommen bei HaldenFunk >%s<", username.c_str());
+      msgLen = snprintf(data, 127, "00c|Glueck Auf! Glueck Auf! Willkommen bei HaldenFunk >%s<", username.c_str());
     }
 
     struct Datagram datagram1 = buildDatagram(BROADCAST, 'i', (uint8_t *)data, msgLen);
@@ -399,6 +433,10 @@ public:
 void setupSerial()
 {
   Serial.println("* Initializing serial...");
+#ifdef DAR_OMI
+  Serial.println(" --> Omi: keine serielle Konsole (nur Protokoll)");
+  return;
+#endif
 
   radio->connect(new WelcomeMessage())
       ->connect(new HistoryReplay(history))
@@ -424,41 +462,17 @@ void setupLoRa()
   char cfgStr[MESSAGE_LENGTH];
 #ifdef LORA_CS
   Serial.println("* Initializing LoRa...");
-  #ifdef LOPY4
-  SPI.begin(LORA_SCK, LORA_MISO, LORA_MOSI); //LORA_CS);
-  #endif
-  
-  #if defined(LORA_SCK) && !defined(LOPY4)
   SPI.begin(LORA_SCK, LORA_MISO, LORA_MOSI);
-  #endif
   pinMode(LORA_CS, OUTPUT);
   digitalWrite(LORA_CS, LOW);
-  #ifdef DUAL_LORA
-  pinMode(LORA2_CS, OUTPUT);
-  digitalWrite(LORA2_CS, HIGH);
-  #endif
   const RadioPreset &rp = activePreset();
   Layer1Class *Layer1_1 = new Layer1Class(&lora, 0, LORA_CS, LORA_RST, LORA_IRQ, rp.sf, rp.freqMHz, txPower, rp.bwKHz, LORA_TCXO, rp.cr, rp.dutyLimit);
   Layer1_main = Layer1_1;
-  #ifdef DUAL_LORA
-  digitalWrite(LORA_CS, HIGH);
-  digitalWrite(LORA2_CS, LOW);
-  Layer1Class *Layer1_2 = new Layer1Class(&lora2, 0, LORA2_CS, LORA2_RST, LORA2_IRQ, rp.sf, rp.freqMHz, txPower, rp.bwKHz, LORA_TCXO, rp.cr, rp.dutyLimit);
-  digitalWrite(LORA_CS, LOW);
-  digitalWrite(LORA2_CS, HIGH);
-  #endif
   if(Layer1_1->init())
   {
-    #ifndef DUAL_LORA
     Serial.printf(" --> Layer1 init succeeded\r\n");
     LL2 = new LL2Class(Layer1_1);
     LL2->setDutyCycle(rp.dutyLimit);
-    #else
-    if(Layer1_2->init()){
-      Serial.printf(" --> Dual Layer1 init succeeded\r\n");
-      LL2 = new LL2Class(Layer1_1, Layer1_2);
-    }
-    #endif
     LL2->setLocalAddress(nodeAddress);
     LL2->setInterval(routeInterval);
     LoRaClient *lora_client = new LoRaClient(LL2);
@@ -486,6 +500,40 @@ void drawStatusBar()
   {
     return;
   }
+#ifdef DAR_OMI
+  // Omi: immer derselbe einfache Text, kein Menue, keine Seiten.
+  // Kleine Verschiebung (0-2 px) alle paar Minuten gegen Einbrennen des OLED.
+  int dx = (millis() / 300000UL) % 3;
+  display.clear();
+  display.setColor(WHITE);
+  display.setTextAlignment(TEXT_ALIGN_LEFT);
+  if (!ssid[0])
+  {
+    display.setFont(ArialMT_Plain_16);
+    display.drawString(dx, 24, "Bitte warten ...");
+  }
+  else if (!loraInitialized)
+  {
+    display.setFont(ArialMT_Plain_16);
+    display.drawString(dx, 0, "Funk FEHLER");
+    display.setFont(ArialMT_Plain_10);
+    display.drawString(dx, 24, "Bitte Gerät aus- und");
+    display.drawString(dx, 36, "wieder einschalten.");
+  }
+  else
+  {
+    display.setFont(ArialMT_Plain_16);
+    display.drawString(dx, 0, apOk ? "Funk an" : "Funk an, WLAN ...");
+    display.setFont(ArialMT_Plain_10);
+    display.drawString(dx, 20, "Handy mit WLAN verbinden:");
+    display.setFont(ArialMT_Plain_16);
+    display.drawString(dx, 32, ssid);
+    display.setFont(ArialMT_Plain_10);
+    display.drawString(dx, 52, "ohne Passwort");
+  }
+  display.display();
+  return;
+#endif
 
   display.setFont(ArialMT_Plain_10);
 
@@ -550,7 +598,9 @@ void setupDisplay()
     display.flipScreenVertically();
     display.clear();
 
+#ifndef DAR_OMI // Omi: keine Nachrichten auf dem Display, nur fester Statustext
     radio->connect(new OLEDClient(&display, 0, STATUS_BAR_HEIGHT + 1, OLED_WIDTH, OLED_HEIGHT));
+#endif
 
     drawStatusBar();
   }
@@ -609,7 +659,7 @@ void setupNetwork()
   setupMDNS();
   bootMark("HTTP");
   setupHTTPSever();
-  bootMark("Telnet/WebSocket");
+  bootMark("WebSocket");
   // No network console on an open AP. Operator configuration stays on USB.
   setupWebSocket();
 #ifdef HAS_BLE
@@ -666,7 +716,12 @@ void setup()
   bootMark("Serial");
 
   // Get saved settings
+#ifdef DAR_OMI
+  // Omi: gespeicherte Einstellungen werden ignoriert -> immer Standard (Funkprofil EU Narrow)
+  Serial.println("Omi-Version: feste Standardeinstellungen");
+#else
   getSettings();
+#endif
   bootMark("Einstellungen");
 
   setCpuFrequencyMhz(CLOCK_SPEED); //Set CPU clock in config.h
@@ -682,6 +737,10 @@ void setup()
   setupSerial();
   board = new BoardClient(fsInitialized ? (fs::FS *)&LittleFS : NULL);
   radio->connect(board);
+#ifdef TDECK_SCREEN
+  tdeckUI.attachBoard(board);
+  radio->connect(&tdeckUI);
+#endif
 #ifndef WIFI_LATE
   // HTTP und WebSocket erst nach SD/LittleFS und History starten.
   // serveStatic() benoetigt ein bereits eingebundenes Dateisystem.
@@ -694,6 +753,11 @@ void setup()
   setupLoRa();
   bootMark("Display");
   setupDisplay();
+#ifdef TDECK_SCREEN
+  bootMark("TDeck Display");
+  tdeckUI.beginDisplay();
+  if (history) history->replay(&tdeckUI);
+#endif
   setupGPS();
 #ifdef WIFI_LATE
   // WLAN zuletzt, mit Pause nach dem Funkmodul (Stromspitzen entzerren)
@@ -701,6 +765,9 @@ void setup()
   setupNetwork();
 #endif
   bootMark("fertig");
+#ifdef DAR_OMI
+  drawStatusBar(); // WLAN-Name steht erst jetzt fest (Heltec: WLAN zuletzt)
+#endif
 
   internal_clients = radio->clients.size();
 
@@ -709,6 +776,9 @@ void setup()
 
 void loop()
 {
+#ifdef DAR_OMI
+  dns_server.processNextRequest();
+#endif
   radio->loop();
   if(loraInitialized){
     int new_clients = radio->clients.size() - internal_clients;
@@ -744,7 +814,9 @@ void loop()
       lastApPrint = millis();
       Serial.printf("[WLAN] %s | SSID: %s | offen, ohne Passwort | http://%s | Clients: %d\n", apOk ? "AP aktiv" : "AP FEHLER", ssid,
                     WiFi.softAPIP().toString().c_str(), WiFi.softAPgetStationNum());
-#ifdef HAS_OLED
+#if defined(HAS_OLED) && defined(DAR_OMI)
+      drawStatusBar();
+#elif defined(HAS_OLED)
       if (displayInitialized && clients == 0)
       {
         display.setColor(BLACK);
@@ -761,11 +833,9 @@ void loop()
 #endif
     }
   }
-  // reconnect only in WiFi client mode 
+  // reconnect only in WiFi client mode
 #ifdef WIFI_SSID
-  {
-    checkWiFi();
-  }
+  checkWiFi();
 #endif
 }
 

@@ -34,7 +34,8 @@ public:
     void loop();
     void receive(struct Datagram datagram, size_t len);
     String toJson();
-    size_t count() { return _posts.size(); }
+    size_t count() const { return _posts.size(); }
+    const BoardPost *at(size_t index) const { return index < _posts.size() ? &_posts[index] : nullptr; }
 
 private:
     fs::FS *_fs;

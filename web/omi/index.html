@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="de"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Notfunk</title>
+<link rel="icon" href="icon.png">
+<style>
+/* Omi-Version: ein Bildschirm, große Schrift, starker Kontrast, keine Menüs */
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#fff;color:#000;font-family:system-ui,-apple-system,sans-serif;font-size:22px;line-height:1.35}
+body{display:flex;flex-direction:column;max-width:700px;margin:0 auto}
+header{padding:12px 14px;border-bottom:3px solid #000}
+h1{margin:0;font-size:1.6rem}
+#st{margin-top:4px;font-weight:700;font-size:1.05rem}
+#st.ok{color:#006400}#st.bad{color:#b00000}
+#log{flex:1;overflow-y:auto;padding:12px 14px;display:flex;flex-direction:column;gap:12px}
+.m{border:3px solid #000;border-radius:14px;padding:10px 14px;max-width:94%;word-wrap:break-word;background:#fff}
+.m.ich{align-self:flex-end;background:#e6f2ff;border-color:#004a99}
+.m.sys{align-self:center;border:0;background:#fff3c4;font-weight:700}
+.m .n{display:block;font-weight:800}
+.m .tm{display:block;font-size:.8rem;color:#333;margin-top:2px}
+.leer{color:#333;text-align:center;margin-top:30px}
+form{border-top:3px solid #000;padding:12px 14px calc(12px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:10px;background:#fff}
+label{font-weight:800}
+textarea{width:100%;min-height:3.4em;font:inherit;padding:12px;border:3px solid #000;border-radius:12px;resize:none}
+textarea:focus{outline:4px solid #004a99}
+button{font:inherit;font-size:1.4rem;font-weight:800;padding:18px;border:0;border-radius:14px;background:#004a99;color:#fff}
+button:active{background:#002f63}
+#hinweis{font-weight:700;color:#b00000;min-height:1em}
+</style></head><body>
+<header><h1>Notfunk</h1><div id="st" class="bad">Bitte warten …</div></header>
+<div id="log"><p class="leer" id="leer">Noch keine Nachrichten.</p></div>
+<form id="f">
+ <label for="msg">Ihre Nachricht:</label>
+ <textarea id="msg" rows="2" maxlength="180" placeholder="Hier schreiben"></textarea>
+ <div id="hinweis"></div>
+ <button type="submit">Senden</button>
+</form>
+<script>
+// Gleiches Nachrichtenformat wie DisAHRsterRadio: "c|<Name> Text". Name = WLAN-Name des Geräts (kein Namensdialog).
+const $=s=>document.querySelector(s),enc=new TextEncoder(),dec=new TextDecoder();
+const DEMO=/[?&]demo/.test(location.search);
+let ws,cid=0,name='Notfunk';
+function esc(t){return t.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+function zeit(){return new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})+' Uhr'}
+function zeige(t,id){
+ if(t.startsWith('~'))return; // Beitritts-Meldungen anderer Geräte weglassen
+ const m=t.match(/^<([^>]{1,32})>\s?([\s\S]*)$/),d=document.createElement('div');$('#leer')&&$('#leer').remove();
+ if(!m){d.className='m sys';d.textContent=t}
+ else{const ich=m[1]==name;d.className='m'+(ich?' ich':'');
+  d.innerHTML='<span class="n">'+(ich?'Ich':'Von '+esc(m[1]))+':</span>'+esc(m[2])+'<span class="tm">'+zeit()+(id!==undefined?' · <span id="p'+id+'">wird gesendet …</span>':'')+'</span>'}
+ $('#log').append(d);$('#log').scrollTop=1e9}
+function status(ok){$('#st').textContent=ok?'Funk bereit ✓':'Nicht verbunden. Bitte warten …';$('#st').className=ok?'ok':'bad'}
+function fertig(id){const p=document.getElementById('p'+id);if(p)p.textContent='gesendet ✓'}
+function verbinde(){
+ if(DEMO)return demo();
+ ws=new WebSocket('ws://'+location.host+'/ws');ws.binaryType='arraybuffer';
+ ws.onopen=()=>status(1);ws.onclose=()=>{status(0);setTimeout(verbinde,3000)};
+ ws.onmessage=e=>{const b=new Uint8Array(e.data);if(b.length<3)return;const id=b[0]|b[1]<<8,s=dec.decode(b.slice(2));
+  if(s==='!')return fertig(id);
+  if(s.startsWith('c|'))zeige(s.slice(2))}}
+$('#f').onsubmit=e=>{e.preventDefault();const v=$('#msg').value.trim().replace(/\s+/g,' ');$('#hinweis').textContent='';if(!v)return;
+ const t='<'+name+'> '+v,p=enc.encode('c|'+t);
+ if(p.length>220)return $('#hinweis').textContent='Die Nachricht ist zu lang. Bitte kürzer schreiben.';
+ if(!DEMO&&!(ws&&ws.readyState==1))return $('#hinweis').textContent='Nicht verbunden. Bitte kurz warten.';
+ const id=cid=(cid+1)&0xffff,b=new Uint8Array(p.length+2);b[0]=id&255;b[1]=id>>8;b.set(p,2);
+ if(DEMO)setTimeout(()=>fertig(id),500);else ws.send(b);
+ zeige(t,id);$('#msg').value=''};
+function demo(){name='Notfunk-1A2B3C';status(1);
+ zeige('<Feuerwehr-Dernau> Trinkwasser gibt es ab 14 Uhr am Rathaus.');
+ zeige('<Notfunk-7F00C2> Bei uns ist alles gut. Wir sind zu Hause.');
+ zeige('<Notfunk-1A2B3C> Mir geht es gut. Ich bin zu Hause.');fertig(0)}
+fetch('/api/info').then(r=>r.json()).then(d=>{if(d.ssid)name=d.ssid}).catch(()=>{}).finally(verbinde);
+</script></body></html>

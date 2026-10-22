@@ -1,69 +1,24 @@
-diff --git a/.github/workflows/build.yml b/.github/workflows/build.yml
-index 2a0f7c4..bfc01ec 100644
---- a/.github/workflows/build.yml
-+++ b/.github/workflows/build.yml
-@@ -69,3 +69,4 @@ jobs:
-           name: firmware-${{ matrix.env }}
-           if-no-files-found: error
-           path: artefakt/*
-+
-diff --git a/.github/workflows/release.yml b/.github/workflows/release.yml
-index fe69be9..57f1a16 100644
---- a/.github/workflows/release.yml
-+++ b/.github/workflows/release.yml
-@@ -63,11 +63,21 @@ jobs:
-       - name: Pakete prüfen (Vollständigkeit, Prüfsummen, Version)
-         run: |
-           V=$(python3 tools/version.py --get)
--          python3 tools/verify_release.py dist DisAHRsterRadio "$V" littlefs.bin tdeck twatch-s3
--          (cd dist && sha256sum *.zip > SHA256SUMS-DisAHRsterRadio-$V.txt)
-+          python3 tools/verify_release.py dist HaldenFunk "$V" littlefs.bin tdeck twatch-s3
-+          (cd dist && sha256sum *.zip > SHA256SUMS-HaldenFunk-$V.txt)
-+      - name: Flyer zur Tag-Version neu erzeugen
-+        run: |
-+          python3 -m pip install 'qrcode[pil]'
-+          python3 tools/flyer/flyer.py
-+          python3 - <<'PY'
-+          from pathlib import Path
-+          for name in ('HaldenFunk-Flyer.pdf', 'HaldenFunk-Flyer-digital.pdf'):
-+              path = Path('docs/flyer') / name
-+              assert path.is_file() and path.stat().st_size > 10000 and path.open('rb').read(5) == b'%PDF-', name
-+          PY
-       - name: Release-Text erzeugen
-         run: |
--          python3 tools/release_notes.py "$(python3 tools/version.py --get)" "${{ github.repository }}" DisAHRsterRadio \
-+          python3 tools/release_notes.py "$(python3 tools/version.py --get)" "${{ github.repository }}" HaldenFunk \
-             "tdeck=LILYGO T-Deck Plus (SX1262)" "twatch-s3=LILYGO T-Watch S3 (SX1262)" | tee notes.md
-       - name: Release veröffentlichen
-         if: env.TAG != ''
-@@ -79,7 +79,7 @@ jobs:
-           if gh release view "$TAG" >/dev/null 2>&1; then
-             gh release upload "$TAG" $ASSETS --clobber
-           else
--            case "$TAG" in *-*) gh release create "$TAG" --prerelease --verify-tag --title "DisAHRsterRadio $TAG (Vorabversion)" --notes-file notes.md $ASSETS;;
--              *) gh release create "$TAG" --verify-tag --title "DisAHRsterRadio $TAG" --notes-file notes.md $ASSETS;; esac
-+            case "$TAG" in *-*) gh release create "$TAG" --prerelease --verify-tag --title "HaldenFunk $TAG (Vorabversion)" --notes-file notes.md $ASSETS;;
-+              *) gh release create "$TAG" --verify-tag --title "HaldenFunk $TAG" --notes-file notes.md $ASSETS;; esac
-           fi
-           gh release view "$TAG" --json assets --jq '.assets[].name'
 diff --git a/firmware/main.ino b/firmware/main.ino
-index 160e2d4..8a7aa46 100644
+index f905ebe..591cba7 100644
 --- a/firmware/main.ino
 +++ b/firmware/main.ino
-@@ -54,9 +54,9 @@ XPowersAXP2101 pmu;
+@@ -64,12 +64,12 @@ XPowersAXP2101 pmu;
  #include "DisasterHistory.h"
  #include "DisasterMiddleware.h"
  
 -#define MDNS_NAME_PREFIX "disahrster"
 -#define HOST_NAME "disahrsterradio"
--#define WIFI_AP_SSID_PREFIX "DisAHRsterRadio-"
 +#define MDNS_NAME_PREFIX "haldenfunk"
 +#define HOST_NAME "haldenfunk"
+ #ifdef DAR_OMI
+ #define WIFI_AP_SSID_PREFIX "Notfunk-" // Omi: kurzer, verstaendlicher WLAN-Name
+ #else
+-#define WIFI_AP_SSID_PREFIX "DisAHRsterRadio-"
 +#define WIFI_AP_SSID_PREFIX "HaldenFunk-"
+ #endif
  
  #define INDEX_FILE "index.html"
- 
-@@ -281,7 +281,7 @@ void setupHTTPSever()
+@@ -295,7 +295,7 @@ void setupHTTPSever()
    http_server.on("/api/info", HTTP_GET, [](AsyncWebServerRequest *request) {
      char json[768];
      snprintf(json, sizeof(json),
@@ -72,50 +27,31 @@ index 160e2d4..8a7aa46 100644
               "\"lora\":%s,\"preset\":%d,\"presetId\":\"%s\",\"presetName\":\"%s\",\"freq\":%.3f,\"bw\":%.1f,\"sf\":%d,\"cr\":\"4/%d\",\"airtimeMs\":%lu,\"airtimeBudgetMs\":%lu,\"airtimePct\":%.2f,\"dutyLimitPct\":%.0f,\"txDeferred\":%lu,\"txPower\":%d,\"routes\":%d,\"clients\":%d,\"sd\":%s,\"uptime\":%lu,"
               "\"heap\":%u,\"minHeap\":%u,\"maxBlock\":%u,\"heapWarn\":%u}",
               DAR_VERSION, BOARD_NAME, nodeAddress, ssid, loraInitialized ? "true" : "false", radioPreset, activePreset().id, activePreset().name, loraFreqMHz(), activePreset().bwKHz, activePreset().sf, activePreset().cr,
-@@ -371,11 +371,11 @@ public:
+@@ -405,11 +405,11 @@ public:
      Serial.printf("WelcomeMessage username: >%s<\n", username.c_str());
      if (username.isEmpty())
      {
 -      msgLen = sprintf(data, "00c|Willkommen bei DisAHRsterRadio ");
-+      msgLen = sprintf(data, "00c|Glueck Auf! Willkommen bei HaldenFunk ");
++      msgLen = sprintf(data, "00c|Glueck Auf! Glueck Auf! Willkommen bei HaldenFunk ");
      }
      else
      {
 -      msgLen = snprintf(data, 127, "00c|Willkommen bei DisAHRsterRadio >%s<", username.c_str());
-+      msgLen = snprintf(data, 127, "00c|Glueck Auf! Willkommen bei HaldenFunk >%s<", username.c_str());
++      msgLen = snprintf(data, 127, "00c|Glueck Auf! Glueck Auf! Willkommen bei HaldenFunk >%s<", username.c_str());
      }
  
      struct Datagram datagram1 = buildDatagram(BROADCAST, 'i', (uint8_t *)data, msgLen);
-@@ -672,11 +672,8 @@ void setup()
+@@ -727,7 +727,7 @@ void setup()
    setCpuFrequencyMhz(CLOCK_SPEED); //Set CPU clock in config.h
    getCpuFrequencyMhz(); //Get CPU clock
  
 -  Serial.printf("\nDisAHRsterRadio %s (%s) - basiert auf sudomesh/disaster-radio\n", DAR_VERSION, BOARD_NAME);
 +  Serial.printf("\nHaldenFunk %s (%s) - basiert auf sudomesh/disaster-radio\n", DAR_VERSION, BOARD_NAME);
    delay(STARTUP_STAGGER_MS); // gestaffelter Start: Spannung stabilisieren lassen
--#ifndef WIFI_LATE
--  setupNetwork();
--#endif
    bootMark("SD");
    setupSD();
-   bootMark("LittleFS");
-@@ -683,9 +680,14 @@ void setup()
-   setupFS();
-   setupHistory();
-   setupSerial();
-   board = new BoardClient(fsInitialized ? (fs::FS *)&LittleFS : NULL);
-   radio->connect(board);
-+#ifndef WIFI_LATE
-+  // HTTP und WebSocket erst nach SD/LittleFS und History starten.
-+  // serveStatic() benoetigt ein bereits eingebundenes Dateisystem.
-+  setupNetwork();
-+#endif
-   delay(STARTUP_STAGGER_MS);
-   bootMark("Versorgung");
-   setupBoardPower();
-   bootMark("LoRa");
 diff --git a/firmware/platformio.ini b/firmware/platformio.ini
-index bd44323..028028e 100644
+index 55517cb..bbeda41 100644
 --- a/firmware/platformio.ini
 +++ b/firmware/platformio.ini
 @@ -1,4 +1,4 @@
@@ -138,10 +74,10 @@ index deb7b21..b511e9a 100644
            (uint8_t)(uniqueId >> 16), (uint8_t)(uniqueId >> 24),
            (uint8_t)(uniqueId >> 32), (uint8_t)(uniqueId >> 40));
 diff --git a/tools/ANLEITUNG.template.md b/tools/ANLEITUNG.template.md
-index f560ba4..14b865d 100644
+index 1c65d17..cd65b64 100644
 --- a/tools/ANLEITUNG.template.md
 +++ b/tools/ANLEITUNG.template.md
-@@ -1,10 +1,10 @@
+@@ -1,8 +1,8 @@
 -> Offenes WLAN; BLE-UART ohne PIN in den zusätzlichen Testprofilen. Alte Kopplungen bei Bedarf am Handy entfernen. Details: https://github.com/Pietwars/DisAHRsterRadio/blob/main/docs/OFFENER_ZUGANG.md
 +> Offenes WLAN; BLE-UART ohne PIN in den zusätzlichen Testprofilen. Alte Kopplungen bei Bedarf am Handy entfernen. Details: https://github.com/Pietwars/HaldenFunk/blob/main/docs/OFFENER_ZUGANG.md
  
@@ -151,38 +87,17 @@ index f560ba4..14b865d 100644
 -Version @VERSION@ (Commit @COMMIT@) · Quelle: https://github.com/Pietwars/DisAHRsterRadio
 +Version @VERSION@ (Commit @COMMIT@) · Quelle: https://github.com/Pietwars/HaldenFunk
  
--> ⚠️ Kein zertifiziertes Notrufsystem. In Lebensgefahr immer **112** wählen. Diese Version ist auf echter Hardware **nicht abgenommen** (frühere Stände liefen beim Nutzer auf einem LILYGO T3 V1.6.1; T-Deck Plus und T-Watch S3 sind neu und noch nicht auf Hardware geprüft).
-+> ⚠️ Kein zertifiziertes Notrufsystem. In Lebensgefahr immer **112** wählen. Diese Version ist auf echter Hardware **nicht abgenommen** (die gleiche Basis lief bei DisAHRsterRadio auf einem LILYGO T3 V1.6.1; T-Deck Plus und T-Watch S3 sind neu und noch nicht auf Hardware geprüft).
+ > ⚠️ Kein zertifiziertes Notrufsystem. In Lebensgefahr immer **112** wählen. T-Deck-Standalone: Start, lokale Bedienung, Tastatur, Trackball, Touch-Kalibrierung und Hilfefunktionen vom Nutzer bestätigt. GPS/Karte im Freien und umfassende Funk-/Dauertests sind noch offen; keine pauschale Hardwareabnahme für andere Boards.
  
- ## 1. Zuerst die Antenne!
+@@ -28,7 +28,7 @@ Die factory-Datei enthält Bootloader (@BOOT@), Partitionstabelle (0x8000), boot
  
-@@ -16,7 +16,7 @@ Version @VERSION@ (Commit @COMMIT@) · Quelle: https://github.com/Pietwars/DisAH
- 2. https://espressif.github.io/esptool-js/ öffnen, Baudrate 921600 (bei Problemen 115200), **Connect** und den Port wählen.
-    - T-Deck Plus: Wird kein Port gefunden, den **Trackball** gedrückt halten und einschalten (bzw. Reset), dann loslassen.
-    - T-Watch S3: USB-C neu einstecken; bei ausgeschalteter Uhr kurz die Seitentaste drücken.
--3. Bei **Flash Address** `0x0` eintragen und `DisAHRsterRadio-@ZIP@-factory.bin` wählen.
-+3. Bei **Flash Address** `0x0` eintragen und `HaldenFunk-@ZIP@-factory.bin` wählen.
- 4. Optional zuerst **Erase Flash** (löscht alles, auch gespeicherte Aushänge und Einstellungen).
- 5. **Program** und warten, bis „Leaving…“ erscheint. Dann **RST** drücken oder kurz vom Strom trennen.
- 
-@@ -26,7 +26,7 @@ Die factory-Datei enthält Bootloader (@BOOT@), Partitionstabelle (0x8000), boot
- 
- Auf T-Deck Plus und T-Watch S3 bleibt das Display in dieser Version **dunkel** (noch kein Display-Treiber) – das Gerät läuft trotzdem; die Bedienung erfolgt komplett über das WLAN im Browser. Die serielle Ausgabe (USB, 115200 Baud) zeigt den Start.
+ **Pakete `tdeck` und `twatch-s3`:** Bedienung über WLAN; das Display bleibt dunkel. Das gilt nicht für `tdeck-standalone`. Die serielle Ausgabe (USB, 115200 Baud) zeigt den Start. Alle Pakete verwenden LoRaLayer2 und sind nicht mit MeshCore oder Meshtastic kompatibel.
  
 -Am Handy das WLAN `DisAHRsterRadio-XXXXXX` auswählen und verbinden (höchstens 4 Handys). Bei „Kein Internet“ verbunden bleiben, dann `http://192.168.4.1` oder `http://disahrster.local` öffnen. Achtung: offenes, unverschlüsseltes WLAN – jede Person in Reichweite kann mitlesen und senden. Telnet ist entfernt; Konfiguration erfolgt über USB. BLE-UART ohne PIN ist in den zusätzlichen `*-ble`-Testprofilen verfügbar; deren abweichende Partitionierung beachten.
 +Am Handy das WLAN `HaldenFunk-XXXXXX` auswählen und verbinden (höchstens 4 Handys). Bei „Kein Internet“ verbunden bleiben, dann `http://192.168.4.1` oder `http://haldenfunk.local` öffnen. Achtung: offenes, unverschlüsseltes WLAN – jede Person in Reichweite kann mitlesen und senden. Telnet ist entfernt; Konfiguration erfolgt über USB. BLE-UART ohne PIN ist in den zusätzlichen `*-ble`-Testprofilen verfügbar; deren abweichende Partitionierung beachten.
  
  ## 4. Update (nur Firmware)
  
-@@ -40,7 +40,7 @@ Nur wenn sich Weboberfläche oder Karten geändert haben: zusätzlich `teile/lit
- 
- | Datei | Adresse |
- |---|---|
--| `DisAHRsterRadio-@ZIP@-factory.bin` | 0x0 (komplett) |
-+| `HaldenFunk-@ZIP@-factory.bin` | 0x0 (komplett) |
- | `teile/bootloader.bin` | @BOOT@ |
- | `teile/partitions.bin` | 0x8000 |
- | `teile/boot_app0.bin` | 0xe000 |
 diff --git a/tools/build_pages.py b/tools/build_pages.py
 index dfd0744..5d69ef6 100644
 --- a/tools/build_pages.py
@@ -221,7 +136,7 @@ index c19346e..292d5ff 100644
      os.makedirs(OUT, exist_ok=True)
      base = os.path.join(OUT, fn.replace('.geojson', '.json'))
 diff --git a/tools/package.sh b/tools/package.sh
-index 3334c1f..5b6360d 100755
+index 98992a8..dfafead 100755
 --- a/tools/package.sh
 +++ b/tools/package.sh
 @@ -5,7 +5,7 @@ set -euo pipefail

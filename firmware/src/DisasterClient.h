@@ -1,9 +1,7 @@
 #ifndef DISASTERCLIENT_H
 #define DISASTERCLIENT_H
 
-#ifndef SIM
 #include <Arduino.h>
-#endif
 #include <cstddef>
 
 #include "DisasterServer.h"

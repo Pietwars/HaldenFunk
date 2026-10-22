@@ -1,4 +1,5 @@
 #include "LoRaClient.h"
+#include "../utils/utils.h"
 
 bool LoRaClient::init()
 {
@@ -55,7 +56,7 @@ void LoRaClient::receive(struct Datagram datagram, size_t len)
             server->transmit(this, response, msgLen + DATAGRAM_HEADER);
         }
         else if(memcmp(&datagram.message[0], "txpower", 7) == 0){
-            sscanf((char *)&datagram.message[8], "%d", &value);
+            value = parseLong((char *)&datagram.message[8], -1);
             ret = LL2->setTxPower(value, 1);
             memcpy(response.destination, BROADCAST, ADDR_LENGTH);
             response.type = 'i';
@@ -68,7 +69,7 @@ void LoRaClient::receive(struct Datagram datagram, size_t len)
             server->transmit(this, response, msgLen + DATAGRAM_HEADER);
         }
         else if(memcmp(&datagram.message[0], "sf", 2) == 0){
-            sscanf((char *)&datagram.message[3], "%d", &value);
+            value = parseLong((char *)&datagram.message[3], -1);
             ret = LL2->setSpreadingFactor(value, 1);
             memcpy(response.destination, BROADCAST, ADDR_LENGTH);
             response.type = 'i';
@@ -81,7 +82,7 @@ void LoRaClient::receive(struct Datagram datagram, size_t len)
             server->transmit(this, response, msgLen + DATAGRAM_HEADER);
         }
         else if(memcmp(&datagram.message[0], "duty", 4) == 0){
-            sscanf((char *)&datagram.message[5], "%lf", &value2);
+            value2 = parseDouble((char *)&datagram.message[5], -1);
             LL2->setDutyCycle(value2);
             memcpy(response.destination, BROADCAST, ADDR_LENGTH);
             response.type = 'i';
@@ -89,7 +90,7 @@ void LoRaClient::receive(struct Datagram datagram, size_t len)
             server->transmit(this, response, msgLen + DATAGRAM_HEADER);
         }
         else if(memcmp(&datagram.message[0], "interval", 8) == 0){
-            sscanf((char *)&datagram.message[9], "%ld", &value3);
+            value3 = parseLong((char *)&datagram.message[9], -1);
             ret = LL2->setInterval(value3);
             memcpy(response.destination, BROADCAST, ADDR_LENGTH);
             response.type = 'i';

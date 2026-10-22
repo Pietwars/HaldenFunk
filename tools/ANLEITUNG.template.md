@@ -4,7 +4,7 @@
 
 Version @VERSION@ (Commit @COMMIT@) · Quelle: https://github.com/Pietwars/HaldenFunk
 
-> ⚠️ Kein zertifiziertes Notrufsystem. In Lebensgefahr immer **112** wählen. Diese Version ist auf echter Hardware **nicht abgenommen** (die gleiche Basis lief bei DisAHRsterRadio auf einem LILYGO T3 V1.6.1; T-Deck Plus und T-Watch S3 sind neu und noch nicht auf Hardware geprüft).
+> ⚠️ Kein zertifiziertes Notrufsystem. In Lebensgefahr immer **112** wählen. T-Deck-Standalone: Start, lokale Bedienung, Tastatur, Trackball, Touch-Kalibrierung und Hilfefunktionen vom Nutzer bestätigt. GPS/Karte im Freien und umfassende Funk-/Dauertests sind noch offen; keine pauschale Hardwareabnahme für andere Boards.
 
 ## 1. Zuerst die Antenne!
 
@@ -16,15 +16,17 @@ Version @VERSION@ (Commit @COMMIT@) · Quelle: https://github.com/Pietwars/Halde
 2. https://espressif.github.io/esptool-js/ öffnen, Baudrate 921600 (bei Problemen 115200), **Connect** und den Port wählen.
    - T-Deck Plus: Wird kein Port gefunden, den **Trackball** gedrückt halten und einschalten (bzw. Reset), dann loslassen.
    - T-Watch S3: USB-C neu einstecken; bei ausgeschalteter Uhr kurz die Seitentaste drücken.
-3. Bei **Flash Address** `0x0` eintragen und `HaldenFunk-@ZIP@-factory.bin` wählen.
-4. Optional zuerst **Erase Flash** (löscht alles, auch gespeicherte Aushänge und Einstellungen).
+3. Bei **Flash Address** `0x0` eintragen und `@PACKAGE@-factory.bin` wählen.
+4. Flash nicht routinemäßig löschen. **Erase Flash** löscht auch gespeicherte Aushänge und Einstellungen und ist für ein normales Update nicht nötig.
 5. **Program** und warten, bis „Leaving…“ erscheint. Dann **RST** drücken oder kurz vom Strom trennen.
 
 Die factory-Datei enthält Bootloader (@BOOT@), Partitionstabelle (0x8000), boot_app0 (0xe000), Firmware (0x10000) und Weboberfläche/Karten als LittleFS (0x200000).
 
 ## 3. Verbinden
 
-Auf T-Deck Plus und T-Watch S3 bleibt das Display in dieser Version **dunkel** (noch kein Display-Treiber) – das Gerät läuft trotzdem; die Bedienung erfolgt komplett über das WLAN im Browser. Die serielle Ausgabe (USB, 115200 Baud) zeigt den Start.
+**Paket `tdeck-standalone`:** Lokale Bedienung auf dem T-Deck Plus mit Display, Tastatur, Trackball und Touch. Beim ersten Start drei Zielkreuze und danach die Mitte antippen; die geprüfte Ausrichtung wird gespeichert. Wiederholen unter **SETUP → Touch neu kalibrieren**, Abbruch per Trackball-Klick oder Escape. Das Tal-und-Funk-Startbild erscheint beim Einschalten. Chat/Brett: Tastatur und Enter oder SEND; Hilfen erfordern zwei getrennte Bestätigungen. Die lokale Karte ist eine schematische GPS-Ortsübersicht, kein vollständiger OSM-Renderer.
+
+**Pakete `tdeck` und `twatch-s3`:** Bedienung über WLAN; das Display bleibt dunkel. Das gilt nicht für `tdeck-standalone`. Die serielle Ausgabe (USB, 115200 Baud) zeigt den Start. Alle Pakete verwenden LoRaLayer2 und sind nicht mit MeshCore oder Meshtastic kompatibel.
 
 Am Handy das WLAN `HaldenFunk-XXXXXX` auswählen und verbinden (höchstens 4 Handys). Bei „Kein Internet“ verbunden bleiben, dann `http://192.168.4.1` oder `http://haldenfunk.local` öffnen. Achtung: offenes, unverschlüsseltes WLAN – jede Person in Reichweite kann mitlesen und senden. Telnet ist entfernt; Konfiguration erfolgt über USB. BLE-UART ohne PIN ist in den zusätzlichen `*-ble`-Testprofilen verfügbar; deren abweichende Partitionierung beachten.
 
@@ -40,7 +42,7 @@ Nur wenn sich Weboberfläche oder Karten geändert haben: zusätzlich `teile/lit
 
 | Datei | Adresse |
 |---|---|
-| `HaldenFunk-@ZIP@-factory.bin` | 0x0 (komplett) |
+| `@PACKAGE@-factory.bin` | 0x0 (komplett) |
 | `teile/bootloader.bin` | @BOOT@ |
 | `teile/partitions.bin` | 0x8000 |
 | `teile/boot_app0.bin` | 0xe000 |

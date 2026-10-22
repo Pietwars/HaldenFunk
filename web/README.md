@@ -1,5 +1,11 @@
 
-This is the web app served up by the Disaster Radio firmware + the simulator web server.
+# Aktuelle Weboberfläche ab 0.9.4
+
+Die ausgelieferte Oberfläche liegt in `static/index.html` und wird als LittleFS mit der Firmware gepackt. Für diese statische Oberfläche ist kein alter Node-Build nötig. T-Deck Standalone hat zusätzlich eine native lokale Oberfläche; die WLAN-Oberfläche bleibt parallel nutzbar. Versionen pflegt zentral `tools/version.py`.
+
+## Historische Upstream-Web-App
+
+Die folgenden Node-Anweisungen gehören zur alten disaster-radio-Web-App, nicht zum aktuellen statischen MeshAhrtal-Release.
 
 # Dependencies
 

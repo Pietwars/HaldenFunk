@@ -1,4 +1,5 @@
 #include "GPSClient.h"
+#include "../utils/utils.h"
 
 extern char *nodeAddress; //TODO: should not use extern
 
@@ -63,7 +64,7 @@ void GPSClient::receive(struct Datagram datagram, size_t len)
   long value;
   if(datagram.type == 'i'){
     if(memcmp(&datagram.message[0], "gps", 3) == 0){
-      sscanf((char *)&datagram.message[4], "%ld", &value);
+      value = parseLong((char *)&datagram.message[4], 0);
       setBeaconPeriod(value);
       memcpy(response.destination, BROADCAST, ADDR_LENGTH);
       response.type = 'i';

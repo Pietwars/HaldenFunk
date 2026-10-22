@@ -45,6 +45,7 @@ void WebSocketClient::handleData(void *data, size_t len)
     return;
   }
 
+#ifndef DAR_OMI // Omi: keine Befehle ueber den Chat (kein Name speichern, kein Umschalten/Neustart)
   if (datagram.message[4] == '~')
   {
     /// \todo Change WS interface to have name directly
@@ -101,6 +102,7 @@ void WebSocketClient::handleData(void *data, size_t len)
     delay(500);
     ESP.restart();
   }
+#endif
 
     server->transmit(this, datagram, len);
 }

@@ -6,7 +6,7 @@
 #include "secrets.h"
 #endif
 
-#define DAR_VERSION "0.9.3"
+#define DAR_VERSION "0.9.4"
 #define CLOCK_SPEED 240
 // Unter dieser Grenze freien Heaps warnen Weboberfläche (rot) und serielles [HEAP]-Protokoll
 #ifndef HEAP_WARN_BYTES
@@ -115,6 +115,7 @@
 #define LORA_TCXO 1.8f
 #define BOARD_POWER_PIN 10      // Peripherie-Versorgung (LoRa, TFT, Tastatur), HIGH = an
 #define BOARD_TFT_CS 12         // TFT teilt den SPI-Bus mit LoRa: Chip-Select inaktiv halten
+#define BOARD_TFT_DC 11         // ST7789 Daten-/Befehlsleitung
 #define BOARD_TFT_BL 42         // Hintergrundbeleuchtung aus (kein Display-Treiber)
 #define BOARD_SD_CS 39          // SD-Karte am selben SPI-Bus: Chip-Select inaktiv halten
 #endif
@@ -145,14 +146,9 @@
 #error "Kein Board definiert (LILYGO_T3S3_SX1262, LILYGO_T3_V161, HELTEC_V2, LILYGO_TDECK, LILYGO_TWATCH_S3)"
 #endif
 
-#ifndef SD_CS
-#define SD_CS 13
-#endif
-
-#if defined(CONFIG_IDF_TARGET_ESP32S3)
-#define VSPI_OR_FSPI FSPI
-#else
-#define VSPI_OR_FSPI VSPI
+// SD-Kartenschacht vorhanden (T3-S3, T3 V1.6.1); ohne SD_SCK (Heltec V2) entfaellt der SD-Code ganz
+#ifdef SD_SCK
+#define HAS_SD
 #endif
 
 #endif

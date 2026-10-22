@@ -88,5 +88,45 @@
     "app_offset": 65536,
     "partition_offset": 32768,
     "boot_offset": 0
+  },
+  "TDeck_Standalone": {
+    "env": "tdeck-standalone",
+    "chip": "esp32s3",
+    "chip_id": 9,
+    "flash_bytes": 16777216,
+    "ram_bytes": 327680,
+    "app_offset": 65536,
+    "partition_offset": 32768,
+    "boot_offset": 0
+  },
+  "T3_V161_OMI": {
+    "env": "t3-v161-omi",
+    "chip": "esp32",
+    "chip_id": 0,
+    "flash_bytes": 4194304,
+    "ram_bytes": 327680,
+    "app_offset": 65536,
+    "partition_offset": 32768,
+    "boot_offset": 4096
+  },
+  "Heltec_V2_OMI": {
+    "env": "heltec-v2-omi",
+    "chip": "esp32",
+    "chip_id": 0,
+    "flash_bytes": 8388608,
+    "ram_bytes": 327680,
+    "app_offset": 65536,
+    "partition_offset": 32768,
+    "boot_offset": 4096
+  },
+  "T3S3_OMI": {
+    "env": "t3s3-omi",
+    "chip": "esp32s3",
+    "chip_id": 9,
+    "flash_bytes": 4194304,
+    "ram_bytes": 327680,
+    "app_offset": 65536,
+    "partition_offset": 32768,
+    "boot_offset": 0
   }
 }

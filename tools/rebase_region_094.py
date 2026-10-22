@@ -19,12 +19,18 @@ def main():
     conf, own = cs.conf()
     core = Path(tempfile.mkdtemp(prefix="hf-core-"))
     sha = cs.fetch_core(conf["repo"], TARGET, core)
+    # CI-Workflows sind regional und werden nicht aus dem Kern erzeugt. Alte
+    # Workflow-Hunks vor dem Rebase aus dem bisherigen Overlay entfernen.
+    overlay = ROOT / "region/overlay.patch"
+    chunks = overlay.read_text(encoding="utf-8").split("diff --git ")
+    kept = [chunks[0]] + ["diff --git " + c for c in chunks[1:] if not c.startswith("a/.github/workflows/")]
+    overlay.write_text("".join(kept), encoding="utf-8")
     work, err = cs.expected(core, own)
     if not err:
         raise SystemExit("Das alte Overlay war bereits konfliktfrei; normalen core_sync --update verwenden")
 
     rejects = sorted(p.relative_to(work).as_posix() for p in work.rglob("*.rej"))
-    expected = [".github/workflows/release.yml.rej", "firmware/main.ino.rej", "tools/ANLEITUNG.template.md.rej"]
+    expected = ["firmware/main.ino.rej", "tools/ANLEITUNG.template.md.rej"]
     if rejects != expected:
         raise SystemExit(f"Unerwartete Konflikte: {rejects}")
     for rel in rejects:
@@ -36,27 +42,6 @@ def main():
         ("disahrster", "haldenfunk"),
         ("Willkommen bei HaldenFunk ", "Glueck Auf! Willkommen bei HaldenFunk "),
     ])
-    replace(work / ".github/workflows/release.yml", [
-        ("DisAHRsterRadio", "HaldenFunk"),
-    ])
-    release = work / ".github/workflows/release.yml"
-    text = release.read_text(encoding="utf-8")
-    marker = "      - name: Release-Text erzeugen\n"
-    if "Flyer zur Tag-Version neu erzeugen" not in text and marker in text:
-        flyer = """      - name: Flyer zur Tag-Version neu erzeugen
-        run: |
-          python3 -m pip install 'qrcode[pil]'
-          python3 tools/flyer/flyer.py
-          python3 - <<'PY'
-          from pathlib import Path
-          for name in ('HaldenFunk-Flyer.pdf', 'HaldenFunk-Flyer-digital.pdf'):
-              path = Path('docs/flyer') / name
-              assert path.is_file() and path.stat().st_size > 10000 and path.open('rb').read(5) == b'%PDF-', name
-          PY
-"""
-        text = text.replace(marker, flyer + marker)
-        release.write_text(text, encoding="utf-8")
-
     replace(work / "tools/ANLEITUNG.template.md", [
         ("Pietwars/DisAHRsterRadio", "Pietwars/HaldenFunk"),
         ("DisAHRsterRadio", "HaldenFunk"),
